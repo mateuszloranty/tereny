@@ -7,15 +7,30 @@
     <title>Mapa rejonu</title>
 
     <!-- Leaflet CSS -->
-    <!-- <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script> -->
-    <link rel="stylesheet" href="leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- <link rel="stylesheet" href="leaflet.css" /> -->
 
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        *, *::before, *::after { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+        }
+
+        /* === KLUCZOWY FIX DLA LEAFLET === */
+        .leaflet-container,
+        .leaflet-container * {
+            box-sizing: content-box;
+        }
+        .leaflet-container img {
+            max-width: none !important;
+            max-height: none !important;
+        }
+        /* ================================ */
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 
-                         'Segoe UI', Roboto, sans-serif;
+                        'Segoe UI', Roboto, sans-serif;
             background: #f5f5f5;
         }
 
@@ -117,7 +132,6 @@
             color: #999;
         }
 
-        /* Popup dla statusu w/poza rejonem */
         .region-status {
             text-align: center;
             padding: 8px 16px;
@@ -175,8 +189,8 @@
 </div>
 
 <!-- Leaflet JS -->
-<!-- <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script> -->
-<script src="leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- <script src="leaflet.js"></script> -->
 
 <script>
 (function() {
@@ -247,6 +261,10 @@
 
     // Dopasuj widok do wielokąta
     map.fitBounds(polygon.getBounds(), { padding: [40, 40] });
+
+    setTimeout(function() {
+        map.invalidateSize();
+    }, 200);
 
     // ============================================================
     // 4. DEEP LINKI DO APLIKACJI MAPOWYCH
@@ -385,6 +403,4 @@
 </script>
 
 </body>
-
 </html>
-
