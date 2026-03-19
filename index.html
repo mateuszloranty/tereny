@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, 
           maximum-scale=1.0, user-scalable=no">
-    <title>Mapa rejonu</title>
+    <title>Mapa terenu</title>
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" 
@@ -117,7 +117,7 @@
             color: #999;
         }
 
-        /* Popup dla statusu w/poza rejonem */
+        /* Popup dla statusu w/poza terenem */
         .region-status {
             text-align: center;
             padding: 8px 16px;
@@ -131,8 +131,8 @@
 <body>
 
 <div class="header">
-    <h1 id="region-name">Rejon</h1>
-    <div class="subtitle">Zeskanowano kod rejonu</div>
+    <h1 id="region-name">Teren</h1>
+    <div class="subtitle">Zeskanowano kod terenu</div>
 </div>
 
 <div id="map"></div>
@@ -147,7 +147,7 @@
 <div id="region-status-bar"></div>
 
 <div class="buttons">
-    <div class="section-title">📍 Zobacz rejon w aplikacji</div>
+    <div class="section-title">📍 Zobacz teren w aplikacji</div>
     <div class="btn-group">
         <a id="btn-google" class="btn btn-google" href="#">
             Google Maps
@@ -161,7 +161,7 @@
     </div>
 
     <div class="section-title" style="margin-top: 14px;">
-        🧭 Nawiguj do centrum rejonu
+        🧭 Nawiguj do centrum terenu
     </div>
     <a id="btn-navigate" class="btn btn-navigate" href="#">
         Rozpocznij nawigację
@@ -170,7 +170,7 @@
 
 <div class="legend">
     <span style="color: var(--poly-color, #e74c3c);">■</span> 
-    Granica rejonu &nbsp;|&nbsp; 
+    Granica terenu &nbsp;|&nbsp; 
     <span style="color: #2196F3;">●</span> Twoja lokalizacja
 </div>
 
@@ -183,12 +183,12 @@
     // 1. PARSOWANIE PARAMETRÓW URL
     // ============================================================
     const params  = new URLSearchParams(window.location.search);
-    const name    = params.get('name') || 'Rejon';
+    const name    = params.get('name') || 'Teren';
     const polyStr = params.get('poly');          // lat,lng,lat,lng,...
     const color   = params.get('color') || '#e74c3c';
 
     document.getElementById('region-name').textContent = name;
-    document.title = name + ' — Mapa rejonu';
+    document.title = name + ' — Mapa terenu';
     document.documentElement.style.setProperty('--poly-color', color);
 
     if (!polyStr) {
@@ -242,7 +242,7 @@
         color:       color,
         fillColor:   color,
         fillOpacity: 0.8
-    }).addTo(map).bindPopup('Centrum rejonu: ' + name);
+    }).addTo(map).bindPopup('Centrum terenu: ' + name);
 
     // Dopasuj widok do wielokąta
     map.fitBounds(polygon.getBounds(), { padding: [40, 40] });
@@ -338,13 +338,13 @@
             }).addTo(map);
         }
 
-        // Sprawdź czy użytkownik jest w rejonie
+        // Sprawdź czy użytkownik jest w terenie
         const inside = isPointInPolygon([lat, lng], latlngs);
         statusBar.className = 'region-status ' + 
             (inside ? 'status-inside' : 'status-outside');
         statusBar.textContent = inside
-            ? '✅ Jesteś w granicach tego rejonu'
-            : '⚠️ Jesteś poza granicami tego rejonu';
+            ? '✅ Jesteś w granicach tego terenu'
+            : '⚠️ Jesteś poza granicami tego terenu';
 
         // Aktualizuj link nawigacji — z aktualnej pozycji
         const navBtn = document.getElementById('btn-navigate');
