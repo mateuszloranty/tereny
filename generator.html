@@ -355,7 +355,7 @@ Przykład:
 <!-- Libraries -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
 <script>
 (function() {
@@ -633,33 +633,30 @@ Przykład:
         const qrDiv = document.getElementById('qr-output');
         qrDiv.innerHTML = '';
 
-        QRCode.toCanvas(url, {
-            width:  280,
-            margin: 2,
-            color: { dark: '#2c3e50', light: '#ffffff' },
-            errorCorrectionLevel: url.length > 2000 ? 'L' : 'M'
-        }, function(err, canvas) {
-            if (err) { 
-                console.error(err); 
-                alert('Błąd generowania QR: ' + err.message);
-                return; 
-            }
-            qrDiv.appendChild(canvas);
-            document.getElementById('btn-download-qr').style.display = 'block';
-
-            // Zapisz do listy
-            const name   = document.getElementById('region-name').value;
-            const coords = document.getElementById('coords-output').textContent;
-            savedRegions.push({ 
-                name, 
-                url, 
-                coords, 
-                color: currentColor,
-                date: new Date().toISOString() 
-            });
-            localStorage.setItem('regions', JSON.stringify(savedRegions));
-            renderRegionList();
+        // Użyj QRCode z qrcodejs
+        new QRCode(qrDiv, {
+            text: url,
+            width: 280,
+            height: 280,
+            colorDark: '#2c3e50',
+            colorLight: '#ffffff',
+            correctLevel: url.length > 2000 ? QRCode.CorrectLevel.L : QRCode.CorrectLevel.M
         });
+
+        document.getElementById('btn-download-qr').style.display = 'block';
+
+        // Zapisz do listy
+        const name   = document.getElementById('region-name').value;
+        const coords = document.getElementById('coords-output').textContent;
+        savedRegions.push({ 
+            name, 
+            url, 
+            coords, 
+            color: currentColor,
+            date: new Date().toISOString() 
+        });
+        localStorage.setItem('regions', JSON.stringify(savedRegions));
+        renderRegionList();
     });
 
     // ============================================================
@@ -685,12 +682,14 @@ Przykład:
     // ============================================================
     document.getElementById('btn-download-qr').addEventListener('click', 
     function() {
-        const canvas = document.querySelector('#qr-output canvas');
-        if (!canvas) return;
-        const link    = document.createElement('a');
-        const name    = document.getElementById('region-name').value;
+        // qrcodejs generuje <img> wewnątrz diva
+        const img = document.querySelector('#qr-output img');
+        if (!img) return;
+        
+        const link = document.createElement('a');
+        const name = document.getElementById('region-name').value;
         link.download = `QR_${name.replace(/\s+/g, '_')}.png`;
-        link.href     = canvas.toDataURL('image/png');
+        link.href = img.src;
         link.click();
     });
 
