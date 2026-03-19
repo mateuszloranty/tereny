@@ -245,11 +245,6 @@
             margin-bottom: 12px;
         }
 
-        .instructions.geojson {
-            background: #fef9e7;
-            border-color: #f9e79f;
-        }
-
         .instructions.warning {
             background: #fff3cd;
             border-color: #ffc107;
@@ -349,6 +344,13 @@
             background: #3498db;
         }
 
+        .teren-item .teren-desc {
+            font-size: 11px;
+            color: #888;
+            margin-top: 2px;
+            font-style: italic;
+        }
+
         .teren-count {
             font-size: 12px;
             color: #666;
@@ -420,7 +422,7 @@
                 hosting
             </div>
 
-            <!-- ID i nazwa -->
+            <!-- ID, nazwa, opis -->
             <div class="id-input-row">
                 <div>
                     <label for="teren-id">ID:</label>
@@ -428,9 +430,12 @@
                 </div>
                 <div>
                     <label for="teren-name">Nazwa terenu:</label>
-                    <input type="text" id="teren-name" placeholder="np. Osiedle Centralne" value="Teren 1">
+                    <input type="text" id="teren-name" placeholder="np. Osiedle Centralne" value="">
                 </div>
             </div>
+
+            <label for="teren-desc">Opis terenu:</label>
+            <input type="text" id="teren-desc" placeholder="np. Centralna 1-20" value="">
 
             <label for="base-url">Bazowy URL:</label>
             <input type="url" id="base-url" value="">
@@ -518,6 +523,7 @@
             // KONFIGURACJA
             // ============================================================
             const DB_FILENAME = 'tereny.geojson';
+            const COORD_PRECISION = 5;
             const currentUrl = window.location.href;
             const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
             document.getElementById('base-url').value = baseUrl;
@@ -552,11 +558,9 @@
 
             async function loadFromServer() {
                 if (window.location.protocol === 'file:') {
-                    console.log('[DB] Protokół file:// — pomijam fetch');
                     const localDb = loadFromLocalStorage();
                     if (localDb?.features?.length > 0) {
                         database = localDb;
-                        console.log('[DB] Wczytano z localStorage:', database.features.length, 'terenów');
                     }
                     updateSyncStatus('local');
                     return false;
@@ -564,44 +568,43 @@
 
                 updateSyncStatus('loading');
                 try {
-                    const url = DB_FILENAME + '?t=' + Date.now();
-                    console.log('[DB] Pobieram:', url);
-
-                    const response = await fetch(url);
-                    console.log('[DB] Status odpowiedzi:', response.status);
-
+                    const response = await fetch(DB_FILENAME + '?t=' + Date.now());
                     if (response.ok) {
-                        const text = await response.text();
-                        console.log('[DB] Rozmiar odpowiedzi:', text.length, 'znaków');
-
-                        database = JSON.parse(text);
-                        console.log('[DB] Sparsowano:', database.features?.length, 'terenów');
-
-                        // Sprawdź pierwszy teren
-                        if (database.features?.length > 0) {
-                            const first = database.features[0];
-                            console.log('[DB] Pierwszy teren:', {
-                                id: first.properties?.id,
-                                name: first.properties?.name,
-                                coordsCount: first.geometry?.coordinates?.[0]?.length
-                            });
-                        }
-
+                        database = JSON.parse(await response.text());
                         saveToLocalStorage();
                         updateSyncStatus('synced');
                         return true;
                     }
                     throw new Error('Status: ' + response.status);
                 } catch (e) {
-                    console.error('[DB] Błąd:', e);
                     const localDb = loadFromLocalStorage();
                     if (localDb?.features?.length > 0) {
                         database = localDb;
-                        console.log('[DB] Fallback localStorage:', database.features.length, 'terenów');
                     }
                     updateSyncStatus('local');
                     return false;
                 }
+            }
+
+            // ============================================================
+            // HELPERY: ODCZYT Z FEATURE (simplestyle)
+            // ============================================================
+            function getFeatureId(f) {
+                return f.properties?.id || f.id || '?';
+            }
+
+            function getFeatureTitle(f) {
+                const p = f.properties || {};
+                return p.title || p.name || 'Bez nazwy';
+            }
+
+            function getFeatureDescription(f) {
+                return f.properties?.description || '';
+            }
+
+            function getFeatureColor(f) {
+                const p = f.properties || {};
+                return p.stroke || p.fill || '#e74c3c';
             }
 
             // ============================================================
@@ -717,13 +720,13 @@
                 const name = document.getElementById('teren-name').value.trim();
                 const base = document.getElementById('base-url').value.replace(/\/$/, '');
 
-                // URL z ID
                 document.getElementById('url-output').textContent = `${base}?id=${encodeURIComponent(id)}`;
 
-                // URL tymczasowy (poly)
                 if (currentPolygon) {
                     const latlngs = currentPolygon.getLatLngs()[0];
-                    const polyStr = latlngs.map(ll => `${ll.lat.toFixed(6)},${ll.lng.toFixed(6)}`).join(',');
+                    const polyStr = latlngs.map(ll =>
+                        `${ll.lat.toFixed(COORD_PRECISION)},${ll.lng.toFixed(COORD_PRECISION)}`
+                    ).join(',');
                     document.getElementById('url-poly-output').textContent =
                         `${base}?name=${encodeURIComponent(name)}&poly=${polyStr}&color=${encodeURIComponent(currentColor)}`;
                 } else {
@@ -733,42 +736,29 @@
 
             function getNextId() {
                 if (database.features.length === 0) return '1';
-
-                // Znajdź największy numeryczny prefiks ID
                 const numericIds = database.features
                     .map(f => {
-                        const match = String(f.properties.id).match(/^(\d+)/);
+                        const match = String(getFeatureId(f)).match(/^(\d+)/);
                         return match ? parseInt(match[1]) : 0;
                     })
                     .filter(n => !isNaN(n));
-
                 if (numericIds.length === 0) return '1';
                 return String(Math.max(...numericIds) + 1);
             }
 
-            // Sortowanie ID: numeryczne na początku, potem tekstowe
             function sortFeatures() {
                 database.features.sort((a, b) => {
-                    const aId = String(a.properties.id);
-                    const bId = String(b.properties.id);
-
-                    // Wyciągnij część numeryczną
+                    const aId = String(getFeatureId(a));
+                    const bId = String(getFeatureId(b));
                     const aMatch = aId.match(/^(\d+)(.*)/);
                     const bMatch = bId.match(/^(\d+)(.*)/);
 
                     if (aMatch && bMatch) {
-                        const aNum = parseInt(aMatch[1]);
-                        const bNum = parseInt(bMatch[1]);
-                        if (aNum !== bNum) return aNum - bNum;
-                        // Jeśli numery równe, sortuj po suffixie
-                        return aMatch[2].localeCompare(bMatch[2]);
+                        const diff = parseInt(aMatch[1]) - parseInt(bMatch[1]);
+                        return diff !== 0 ? diff : aMatch[2].localeCompare(bMatch[2]);
                     }
-
-                    // Numeryczne przed tekstowymi
                     if (aMatch && !bMatch) return -1;
                     if (!aMatch && bMatch) return 1;
-
-                    // Oba tekstowe
                     return aId.localeCompare(bId);
                 });
             }
@@ -848,26 +838,57 @@
                 if (!id) return alert('Podaj ID terenu!');
 
                 const name = document.getElementById('teren-name').value.trim() || 'Teren ' + id;
+                const desc = document.getElementById('teren-desc').value.trim();
 
-                // Sprawdź duplikat (porównanie jako stringi)
-                const existing = database.features.findIndex(f => String(f.properties.id) === String(id));
+                const existing = database.features.findIndex(f =>
+                    String(getFeatureId(f)) === String(id)
+                );
                 if (existing !== -1) {
                     if (!confirm(`ID "${id}" istnieje. Nadpisać?`)) return;
                     database.features.splice(existing, 1);
                 }
 
+                // Współrzędne z ustaloną precyzją
                 const latlngs = currentPolygon.getLatLngs()[0];
-                const coordinates = latlngs.map(ll => [ll.lng, ll.lat]);
-                if (coordinates[0][0] !== coordinates[coordinates.length - 1][0] ||
-                    coordinates[0][1] !== coordinates[coordinates.length - 1][1]) {
-                    coordinates.push([coordinates[0][0], coordinates[0][1]]);
+                const coordinates = latlngs.map(ll => [
+                    parseFloat(ll.lng.toFixed(COORD_PRECISION)),
+                    parseFloat(ll.lat.toFixed(COORD_PRECISION))
+                ]);
+
+                // Zamknij wielokąt
+                const first = coordinates[0];
+                const last = coordinates[coordinates.length - 1];
+                if (first[0] !== last[0] || first[1] !== last[1]) {
+                    coordinates.push([first[0], first[1]]);
                 }
 
-                database.features.push({
+                // Feature z simplestyle + Feature.id
+                const feature = {
                     type: 'Feature',
-                    properties: { id: id, name: name, color: currentColor, created: new Date().toISOString() },
-                    geometry: { type: 'Polygon', coordinates: [coordinates] }
-                });
+                    id: id,
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [coordinates]
+                    },
+                    properties: {
+                        id: id,
+                        title: name,
+                        name: name,
+                        stroke: currentColor,
+                        "stroke-opacity": 1,
+                        "stroke-width": 3,
+                        fill: currentColor,
+                        "fill-opacity": 0.15,
+                        created: new Date().toISOString()
+                    }
+                };
+
+                // Dodaj description tylko jeśli niepuste
+                if (desc) {
+                    feature.properties.description = desc;
+                }
+
+                database.features.push(feature);
 
                 sortFeatures();
                 saveToLocalStorage();
@@ -878,6 +899,7 @@
                 const nextId = getNextId();
                 document.getElementById('teren-id').value = nextId;
                 document.getElementById('teren-name').value = 'Teren ' + nextId;
+                document.getElementById('teren-desc').value = '';
                 updateUrl();
 
                 alert(`✅ Dodano "${name}" (ID: ${id})`);
@@ -891,11 +913,8 @@
                 qrDiv.innerHTML = '';
 
                 new QRCode(qrDiv, {
-                    text: url,
-                    width: 256,
-                    height: 256,
-                    colorDark: '#2c3e50',
-                    colorLight: '#ffffff',
+                    text: url, width: 256, height: 256,
+                    colorDark: '#2c3e50', colorLight: '#ffffff',
                     correctLevel: QRCode.CorrectLevel.M
                 });
 
@@ -946,15 +965,19 @@
                 }
 
                 list.innerHTML = database.features.map(f => {
-                    const p = f.properties;
+                    const id = getFeatureId(f);
+                    const title = getFeatureTitle(f);
+                    const desc = getFeatureDescription(f);
+                    const color = getFeatureColor(f);
                     return `
-                <div class="teren-item" data-id="${p.id}">
+                <div class="teren-item" data-id="${id}">
                     <div class="teren-actions">
-                        <button class="action-btn qr" data-id="${p.id}">QR</button>
-                        <button class="action-btn delete" data-id="${p.id}">✕</button>
+                        <button class="action-btn qr" data-id="${id}">QR</button>
+                        <button class="action-btn delete" data-id="${id}">✕</button>
                     </div>
-                    <strong>${p.id}. ${p.name}</strong>
-                    <span style="color:${p.color || '#e74c3c'}">■</span>
+                    <strong>${id}. ${title}</strong>
+                    <span style="color:${color}">■</span>
+                    ${desc ? `<div class="teren-desc">${desc}</div>` : ''}
                 </div>
             `;
                 }).join('');
@@ -970,9 +993,9 @@
                     btn.addEventListener('click', function (e) {
                         e.stopPropagation();
                         const id = this.dataset.id;
-                        const t = database.features.find(f => String(f.properties.id) === String(id));
-                        if (confirm(`Usunąć "${t.properties.name}"?`)) {
-                            database.features = database.features.filter(f => String(f.properties.id) !== String(id));
+                        const t = database.features.find(f => String(getFeatureId(f)) === String(id));
+                        if (confirm(`Usunąć "${getFeatureTitle(t)}"?`)) {
+                            database.features = database.features.filter(f => String(getFeatureId(f)) !== String(id));
                             saveToLocalStorage();
                             updateSyncStatus('local');
                             renderTerenList();
@@ -985,12 +1008,15 @@
                     btn.addEventListener('click', function (e) {
                         e.stopPropagation();
                         const id = this.dataset.id;
-                        const t = database.features.find(f => String(f.properties.id) === String(id));
-                        document.getElementById('teren-id').value = t.properties.id;
-                        document.getElementById('teren-name').value = t.properties.name;
-                        colorPicker.value = t.properties.color || '#e74c3c';
-                        colorHex.value = t.properties.color || '#e74c3c';
-                        currentColor = t.properties.color || '#e74c3c';
+                        const t = database.features.find(f => String(getFeatureId(f)) === String(id));
+                        const color = getFeatureColor(t);
+
+                        document.getElementById('teren-id').value = getFeatureId(t);
+                        document.getElementById('teren-name').value = getFeatureTitle(t);
+                        document.getElementById('teren-desc').value = getFeatureDescription(t);
+                        colorPicker.value = color;
+                        colorHex.value = color;
+                        currentColor = color;
                         updateUrl();
                         enableButtons();
                         document.getElementById('btn-generate-qr').click();
@@ -999,25 +1025,31 @@
             }
 
             function showTerenOnMap(id) {
-                const teren = database.features.find(f => String(f.properties.id) === String(id));
+                const teren = database.features.find(f => String(getFeatureId(f)) === String(id));
                 if (!teren) return;
 
                 const coords = teren.geometry.coordinates[0];
                 const latlngs = coords.map(c => [c[1], c[0]]);
-                const color = teren.properties.color || '#e74c3c';
+
+                const stroke = teren.properties.stroke || teren.properties.fill || '#e74c3c';
+                const fill = teren.properties.fill || teren.properties.stroke || '#e74c3c';
+                const fillOpacity = teren.properties['fill-opacity'] || 0.3;
 
                 drawnItems.clearLayers();
-                const polygon = L.polygon(latlngs, { color, fillColor: color, fillOpacity: 0.3 });
+                const polygon = L.polygon(latlngs, {
+                    color: stroke, fillColor: fill, fillOpacity: fillOpacity
+                });
                 drawnItems.addLayer(polygon);
                 currentPolygon = polygon;
 
                 map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
 
-                document.getElementById('teren-id').value = teren.properties.id;
-                document.getElementById('teren-name').value = teren.properties.name;
-                colorPicker.value = color;
-                colorHex.value = color;
-                currentColor = color;
+                document.getElementById('teren-id').value = getFeatureId(teren);
+                document.getElementById('teren-name').value = getFeatureTitle(teren);
+                document.getElementById('teren-desc').value = getFeatureDescription(teren);
+                colorPicker.value = stroke;
+                colorHex.value = stroke;
+                currentColor = stroke;
 
                 updateUrl();
                 enableButtons();
@@ -1028,24 +1060,38 @@
 
             function renderDbOnMap() {
                 dbLayer.clearLayers();
-                console.log('[MAP] Rysuję', database.features.length, 'terenów na mapie');
 
-                database.features.forEach((f, i) => {
+                database.features.forEach(f => {
                     const coords = f.geometry.coordinates[0];
                     const latlngs = coords.map(c => [c[1], c[0]]);
-                    const color = f.properties.color || '#e74c3c';
 
-                    console.log(`[MAP] Teren ${i}: ${f.properties.id} "${f.properties.name}" — ${coords.length} punktów, kolor: ${color}`);
+                    const stroke = f.properties.stroke || f.properties.fill || '#e74c3c';
+                    const fill = f.properties.fill || f.properties.stroke || '#e74c3c';
+                    const fillOpacity = f.properties['fill-opacity'] || 0.1;
+                    const strokeWidth = f.properties['stroke-width'] || 2;
+                    const strokeOpacity = f.properties['stroke-opacity'] || 1;
+
+                    const title = getFeatureTitle(f);
+                    const desc = getFeatureDescription(f);
+                    const popupText = desc
+                        ? `<b>${title}</b><br>ID: ${getFeatureId(f)}<br><em>${desc}</em>`
+                        : `<b>${title}</b><br>ID: ${getFeatureId(f)}`;
 
                     L.polygon(latlngs, {
-                        color, fillColor: color, fillOpacity: 0.1, weight: 2, dashArray: '5, 5'
-                    }).addTo(dbLayer).bindPopup(`<b>${f.properties.name}</b><br>ID: ${f.properties.id}`);
+                        color: stroke,
+                        opacity: strokeOpacity,
+                        fillColor: fill,
+                        fillOpacity: fillOpacity,
+                        weight: strokeWidth,
+                        dashArray: '5, 5'
+                    }).addTo(dbLayer).bindPopup(popupText);
                 });
 
                 if (database.features.length > 0 && dbLayer.getBounds().isValid()) {
                     map.fitBounds(dbLayer.getBounds(), { padding: [50, 50] });
                 }
             }
+
             // ============================================================
             // EKSPORT / IMPORT
             // ============================================================

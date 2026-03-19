@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pl">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, 
@@ -9,7 +10,11 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -22,8 +27,21 @@
             padding: 14px 16px;
             text-align: center;
         }
-        .header h1 { font-size: 20px; font-weight: 600; }
-        .header .subtitle { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .header .subtitle {
+            font-size: 13px;
+            opacity: 0.8;
+            margin-top: 4px;
+        }
+
+        .header .subtitle:empty {
+            display: none;
+        }
 
         #map {
             width: 100%;
@@ -39,23 +57,43 @@
             color: #666;
             text-align: center;
         }
+
         .info-bar .status {
             display: inline-flex;
             align-items: center;
             gap: 6px;
         }
+
         .info-bar .dot {
-            width: 8px; height: 8px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             display: inline-block;
         }
-        .dot-searching { background: #f39c12; animation: pulse 1s infinite; }
-        .dot-found { background: #27ae60; }
-        .dot-error { background: #e74c3c; }
+
+        .dot-searching {
+            background: #f39c12;
+            animation: pulse 1s infinite;
+        }
+
+        .dot-found {
+            background: #27ae60;
+        }
+
+        .dot-error {
+            background: #e74c3c;
+        }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
         }
 
         .buttons {
@@ -79,16 +117,40 @@
             font-size: 16px;
             font-weight: 600;
             transition: transform 0.1s, opacity 0.2s;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         }
-        .btn:active { transform: scale(0.97); opacity: 0.9; }
-        .btn-google { background: linear-gradient(135deg, #4285F4, #356AC3); }
-        .btn-waze { background: linear-gradient(135deg, #33CCFF, #05A8D6); }
-        .btn-apple { background: linear-gradient(135deg, #333, #111); }
-        .btn-navigate { background: linear-gradient(135deg, #27ae60, #1e8449); }
 
-        .btn-group { display: flex; gap: 10px; }
-        .btn-group .btn { flex: 1; font-size: 14px; padding: 12px 10px; }
+        .btn:active {
+            transform: scale(0.97);
+            opacity: 0.9;
+        }
+
+        .btn-google {
+            background: linear-gradient(135deg, #4285F4, #356AC3);
+        }
+
+        .btn-waze {
+            background: linear-gradient(135deg, #33CCFF, #05A8D6);
+        }
+
+        .btn-apple {
+            background: linear-gradient(135deg, #333, #111);
+        }
+
+        .btn-navigate {
+            background: linear-gradient(135deg, #27ae60, #1e8449);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-group .btn {
+            flex: 1;
+            font-size: 14px;
+            padding: 12px 10px;
+        }
 
         .section-title {
             font-size: 13px;
@@ -113,16 +175,30 @@
             font-weight: 600;
             font-size: 14px;
         }
-        .status-inside { background: #d4edda; color: #155724; }
-        .status-outside { background: #fff3cd; color: #856404; }
+
+        .status-inside {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-outside {
+            background: #fff3cd;
+            color: #856404;
+        }
 
         .message {
             padding: 40px 20px;
             text-align: center;
             font-size: 16px;
         }
-        .message.error { color: #e74c3c; }
-        .message h2 { margin-bottom: 10px; }
+
+        .message.error {
+            color: #e74c3c;
+        }
+
+        .message h2 {
+            margin-bottom: 10px;
+        }
 
         .temp-badge {
             display: inline-block;
@@ -136,288 +212,325 @@
         }
     </style>
 </head>
+
 <body>
 
-<div class="header">
-    <h1 id="region-name">Ładowanie...</h1>
-    <div class="subtitle" id="subtitle">Zeskanowano kod terenu</div>
-</div>
-
-<div id="map"></div>
-
-<div class="info-bar">
-    <span class="status">
-        <span id="gps-dot" class="dot dot-searching"></span>
-        <span id="gps-status">Szukam Twojej lokalizacji...</span>
-    </span>
-</div>
-
-<div id="region-status-bar"></div>
-
-<div class="buttons">
-    <div class="section-title">📍 Zobacz teren w aplikacji</div>
-    <div class="btn-group">
-        <a id="btn-google" class="btn btn-google" href="#">Google Maps</a>
-        <a id="btn-waze" class="btn btn-waze" href="#">Waze</a>
-        <a id="btn-apple" class="btn btn-apple" href="#">Apple Maps</a>
+    <div class="header">
+        <h1 id="region-name">Ładowanie...</h1>
+        <div class="subtitle" id="subtitle"></div>
     </div>
 
-    <div class="section-title" style="margin-top: 14px;">🧭 Nawiguj do centrum terenu</div>
-    <a id="btn-navigate" class="btn btn-navigate" href="#">Rozpocznij nawigację</a>
-</div>
+    <div id="map"></div>
 
-<div class="legend">
-    <span id="legend-color" style="color: #e74c3c;">■</span> 
-    Granica terenu &nbsp;|&nbsp; 
-    <span style="color: #2196F3;">●</span> Twoja lokalizacja
-</div>
+    <div class="info-bar">
+        <span class="status">
+            <span id="gps-dot" class="dot dot-searching"></span>
+            <span id="gps-status">Szukam Twojej lokalizacji...</span>
+        </span>
+    </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div id="region-status-bar"></div>
 
-<script>
-(function() {
-    // ============================================================
-    // 1. PARSOWANIE PARAMETRÓW URL
-    // ============================================================
-    const params = new URLSearchParams(window.location.search);
-    const terenId = params.get('id');
-    const polyStr = params.get('poly');
-    const paramName = params.get('name');
-    const paramColor = params.get('color');
+    <div class="buttons">
+        <div class="section-title">📍 Zobacz teren w aplikacji</div>
+        <div class="btn-group">
+            <a id="btn-google" class="btn btn-google" href="#">Google Maps</a>
+            <a id="btn-waze" class="btn btn-waze" href="#">Waze</a>
+            <a id="btn-apple" class="btn btn-apple" href="#">Apple Maps</a>
+        </div>
 
-    if (terenId) {
-        loadFromDatabase(terenId.trim());
-    } else if (polyStr) {
-        loadFromPolyParam(polyStr, paramName, paramColor);
-    } else {
-        showError('Brak parametru <code>id</code> lub <code>poly</code> w adresie URL.');
-    }
+        <div class="section-title" style="margin-top: 14px;">🧭 Nawiguj do centrum terenu</div>
+        <a id="btn-navigate" class="btn btn-navigate" href="#">Rozpocznij nawigację</a>
+    </div>
 
-    // ============================================================
-    // 2. WCZYTANIE Z BAZY DANYCH (id)
-    // ============================================================
-    function loadFromDatabase(id) {
-        fetch('tereny.geojson?t=' + Date.now())
-            .then(response => {
-                if (!response.ok) throw new Error('Nie znaleziono pliku tereny.geojson');
-                return response.json();
-            })
-            .then(geojson => {
-                // Porównuj jako stringi
-                const teren = geojson.features?.find(f => String(f.properties?.id) === String(id));
-                if (!teren) {
-                    showError(`Nie znaleziono terenu o ID: ${id}`);
+    <div class="legend">
+        <span id="legend-color" style="color: #e74c3c;">■</span>
+        Granica terenu &nbsp;|&nbsp;
+        <span style="color: #2196F3;">●</span> Twoja lokalizacja
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        (function () {
+            // ============================================================
+            // 1. PARSOWANIE PARAMETRÓW URL
+            // ============================================================
+            const params = new URLSearchParams(window.location.search);
+            const terenId = params.get('id');
+            const polyStr = params.get('poly');
+            const paramName = params.get('name');
+            const paramColor = params.get('color');
+
+            if (terenId) {
+                loadFromDatabase(terenId.trim());
+            } else if (polyStr) {
+                loadFromPolyParam(polyStr, paramName, paramColor);
+            } else {
+                showError('Brak parametru <code>id</code> lub <code>poly</code> w adresie URL.');
+            }
+
+            // ============================================================
+            // 2. WCZYTANIE Z BAZY DANYCH (id)
+            // ============================================================
+            function loadFromDatabase(id) {
+                fetch('tereny.geojson?t=' + Date.now())
+                    .then(response => {
+                        if (!response.ok) throw new Error('Nie znaleziono pliku tereny.geojson');
+                        return response.json();
+                    })
+                    .then(geojson => {
+                        const teren = findTerenById(geojson, id);
+                        if (!teren) {
+                            showError(`Nie znaleziono terenu o ID: ${id}`);
+                            return;
+                        }
+
+                        const coords = teren.geometry.coordinates[0];
+                        const latlngs = coords.map(c => [c[1], c[0]]);
+                        const p = teren.properties || {};
+
+                        const name = p.title || p.name || 'Teren ' + id;
+                        const description = p.description || '';
+
+                        const style = {
+                            stroke: p.stroke || p.fill || '#e74c3c',
+                            strokeWidth: p['stroke-width'] || 3,
+                            strokeOpacity: p['stroke-opacity'] || 1,
+                            fill: p.fill || p.stroke || '#e74c3c',
+                            fillOpacity: p['fill-opacity'] || 0.15
+                        };
+
+                        initMap(latlngs, name, description, style, false);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showError('Błąd wczytywania bazy: ' + err.message);
+                    });
+            }
+
+            // Szukaj terenu po ID — Feature.id lub properties.id
+            function findTerenById(geojson, id) {
+                if (!geojson.features) return null;
+                const idStr = String(id).trim();
+
+                return geojson.features.find(f => {
+                    if (f.properties?.id !== undefined && String(f.properties.id) === idStr) return true;
+                    if (f.id !== undefined && String(f.id) === idStr) return true;
+                    return false;
+                });
+            }
+
+            // ============================================================
+            // 3. WCZYTANIE Z PARAMETRU POLY (URL tymczasowy)
+            // ============================================================
+            function loadFromPolyParam(polyStr, name, color) {
+                const raw = polyStr.split(',').map(Number);
+                const latlngs = [];
+
+                for (let i = 0; i < raw.length; i += 2) {
+                    if (!isNaN(raw[i]) && !isNaN(raw[i + 1])) {
+                        latlngs.push([raw[i], raw[i + 1]]);
+                    }
+                }
+
+                if (latlngs.length < 3) {
+                    showError('Nieprawidłowe współrzędne wielokąta.');
                     return;
                 }
-                
-                const coords = teren.geometry.coordinates[0];
-                const latlngs = coords.map(c => [c[1], c[0]]);
-                const name = teren.properties.name || 'Teren ' + id;
-                const color = teren.properties.color || '#e74c3c';
-                
-                initMap(latlngs, name, color, false);
-            })
-            .catch(err => {
-                console.error(err);
-                showError('Błąd wczytywania bazy: ' + err.message);
-            });
-    }
 
-    // ============================================================
-    // 3. WCZYTANIE Z PARAMETRU POLY
-    // ============================================================
-    function loadFromPolyParam(polyStr, name, color) {
-        const raw = polyStr.split(',').map(Number);
-        const latlngs = [];
-        
-        for (let i = 0; i < raw.length; i += 2) {
-            if (!isNaN(raw[i]) && !isNaN(raw[i + 1])) {
-                latlngs.push([raw[i], raw[i + 1]]);
+                const urlColor = color || '#e74c3c';
+                const style = {
+                    stroke: urlColor,
+                    strokeWidth: 3,
+                    strokeOpacity: 1,
+                    fill: urlColor,
+                    fillOpacity: 0.15
+                };
+
+                initMap(latlngs, name || 'Teren tymczasowy', '', style, true);
             }
-        }
 
-        if (latlngs.length < 3) {
-            showError('Nieprawidłowe współrzędne wielokąta.');
-            return;
-        }
+            // ============================================================
+            // 4. WYŚWIETLENIE BŁĘDU
+            // ============================================================
+            function showError(msg) {
+                document.getElementById('region-name').textContent = 'Błąd';
+                document.getElementById('map').innerHTML =
+                    `<div class="message error"><h2>❌ Błąd</h2><p>${msg}</p></div>`;
+                document.querySelector('.buttons').style.display = 'none';
+                document.querySelector('.info-bar').style.display = 'none';
+            }
 
-        initMap(
-            latlngs, 
-            name || 'Teren tymczasowy', 
-            color || '#e74c3c',
-            true
-        );
-    }
+            // ============================================================
+            // 5. INICJALIZACJA MAPY
+            // ============================================================
+            function initMap(latlngs, name, description, style, isTemporary) {
+                const stroke = style.stroke;
+                const strokeWidth = style.strokeWidth;
+                const strokeOpacity = style.strokeOpacity;
+                const fill = style.fill;
+                const fillOpacity = style.fillOpacity;
 
-    // ============================================================
-    // 4. WYŚWIETLENIE BŁĘDU
-    // ============================================================
-    function showError(msg) {
-        document.getElementById('region-name').textContent = 'Błąd';
-        document.getElementById('map').innerHTML = 
-            `<div class="message error"><h2>❌ Błąd</h2><p>${msg}</p></div>`;
-        document.querySelector('.buttons').style.display = 'none';
-        document.querySelector('.info-bar').style.display = 'none';
-    }
+                const titleEl = document.getElementById('region-name');
+                const subtitleEl = document.getElementById('subtitle');
 
-    // ============================================================
-    // 5. INICJALIZACJA MAPY
-    // ============================================================
-    function initMap(latlngs, name, color, isTemporary) {
-        const titleEl = document.getElementById('region-name');
-        titleEl.textContent = name;
-        if (isTemporary) {
-            titleEl.innerHTML = name + '<span class="temp-badge">tymczasowy</span>';
-            document.getElementById('subtitle').textContent = 'Podgląd wielokąta';
-        }
-        
-        document.title = name + ' — Mapa terenu';
-        document.documentElement.style.setProperty('--poly-color', color);
-        document.getElementById('legend-color').style.color = color;
+                titleEl.textContent = name;
+                subtitleEl.textContent = description;
 
-        const centerLat = latlngs.reduce((s, c) => s + c[0], 0) / latlngs.length;
-        const centerLng = latlngs.reduce((s, c) => s + c[1], 0) / latlngs.length;
+                if (isTemporary) {
+                    titleEl.innerHTML = name + '<span class="temp-badge">tymczasowy</span>';
+                }
 
-        const map = L.map('map', {
-            zoomControl: true,
-            attributionControl: false
-        });
+                document.title = name + ' — Mapa terenu';
+                document.documentElement.style.setProperty('--poly-color', stroke);
+                document.getElementById('legend-color').style.color = stroke;
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+                const centerLat = latlngs.reduce((s, c) => s + c[0], 0) / latlngs.length;
+                const centerLng = latlngs.reduce((s, c) => s + c[1], 0) / latlngs.length;
 
-        const polygon = L.polygon(latlngs, {
-            color: color,
-            fillColor: color,
-            fillOpacity: 0.15,
-            weight: 3,
-            dashArray: isTemporary ? '10, 5' : null
-        }).addTo(map);
+                const map = L.map('map', {
+                    zoomControl: true,
+                    attributionControl: false
+                });
 
-        L.circleMarker([centerLat, centerLng], {
-            radius: 6,
-            color: color,
-            fillColor: color,
-            fillOpacity: 0.8
-        }).addTo(map).bindPopup('Centrum: ' + name);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(map);
 
-        map.fitBounds(polygon.getBounds(), { padding: [40, 40] });
+                const polygon = L.polygon(latlngs, {
+                    color: stroke,
+                    opacity: strokeOpacity,
+                    fillColor: fill,
+                    fillOpacity: fillOpacity,
+                    weight: strokeWidth,
+                    dashArray: isTemporary ? '10, 5' : null
+                }).addTo(map);
 
-        setupDeepLinks(centerLat, centerLng, name);
-        setupGeolocation(map, latlngs, centerLat, centerLng);
-    }
+                L.circleMarker([centerLat, centerLng], {
+                    radius: 6,
+                    color: stroke,
+                    fillColor: fill,
+                    fillOpacity: 0.8
+                }).addTo(map).bindPopup('Centrum: ' + name);
 
-    // ============================================================
-    // 6. DEEP LINKI
-    // ============================================================
-    function setupDeepLinks(centerLat, centerLng, name) {
-        const cLat = centerLat.toFixed(6);
-        const cLng = centerLng.toFixed(6);
+                map.fitBounds(polygon.getBounds(), { padding: [40, 40] });
 
-        document.getElementById('btn-google').href =
-            `https://www.google.com/maps/search/?api=1&query=${cLat},${cLng}`;
-        document.getElementById('btn-waze').href =
-            `https://waze.com/ul?ll=${cLat},${cLng}&z=14&navigate=yes`;
-        document.getElementById('btn-apple').href =
-            `https://maps.apple.com/?ll=${cLat},${cLng}&z=14&q=${encodeURIComponent(name)}`;
+                setupDeepLinks(centerLat, centerLng, name);
+                setupGeolocation(map, latlngs, centerLat, centerLng);
+            }
 
-        const navBtn = document.getElementById('btn-navigate');
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        navBtn.href = isIOS
-            ? `https://maps.apple.com/?daddr=${cLat},${cLng}&dirflg=d`
-            : `https://www.google.com/maps/dir/?api=1&destination=${cLat},${cLng}&travelmode=driving`;
+            // ============================================================
+            // 6. DEEP LINKI
+            // ============================================================
+            function setupDeepLinks(centerLat, centerLng, name) {
+                const cLat = centerLat.toFixed(6);
+                const cLng = centerLng.toFixed(6);
 
-        window.terenCenter = { lat: parseFloat(cLat), lng: parseFloat(cLng) };
-    }
+                document.getElementById('btn-google').href =
+                    `https://www.google.com/maps/search/?api=1&query=${cLat},${cLng}`;
+                document.getElementById('btn-waze').href =
+                    `https://waze.com/ul?ll=${cLat},${cLng}&z=14&navigate=yes`;
+                document.getElementById('btn-apple').href =
+                    `https://maps.apple.com/?ll=${cLat},${cLng}&z=14&q=${encodeURIComponent(name)}`;
 
-    // ============================================================
-    // 7. GEOLOKALIZACJA
-    // ============================================================
-    function setupGeolocation(map, latlngs, centerLat, centerLng) {
-        let userMarker = null;
-        let userCircle = null;
-        const gpsDot = document.getElementById('gps-dot');
-        const gpsStatus = document.getElementById('gps-status');
-        const statusBar = document.getElementById('region-status-bar');
+                const navBtn = document.getElementById('btn-navigate');
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                navBtn.href = isIOS
+                    ? `https://maps.apple.com/?daddr=${cLat},${cLng}&dirflg=d`
+                    : `https://www.google.com/maps/dir/?api=1&destination=${cLat},${cLng}&travelmode=driving`;
 
-        function isPointInPolygon(point, polygon) {
-            const [px, py] = point;
-            let inside = false;
-            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-                const [ix, iy] = polygon[i];
-                const [jx, jy] = polygon[j];
-                if (((iy > py) !== (jy > py)) &&
-                    (px < (jx - ix) * (py - iy) / (jy - iy) + ix)) {
-                    inside = !inside;
+                window.terenCenter = { lat: parseFloat(cLat), lng: parseFloat(cLng) };
+            }
+
+            // ============================================================
+            // 7. GEOLOKALIZACJA
+            // ============================================================
+            function setupGeolocation(map, latlngs, centerLat, centerLng) {
+                let userMarker = null;
+                let userCircle = null;
+                const gpsDot = document.getElementById('gps-dot');
+                const gpsStatus = document.getElementById('gps-status');
+                const statusBar = document.getElementById('region-status-bar');
+
+                function isPointInPolygon(point, polygon) {
+                    const [px, py] = point;
+                    let inside = false;
+                    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                        const [ix, iy] = polygon[i];
+                        const [jx, jy] = polygon[j];
+                        if (((iy > py) !== (jy > py)) &&
+                            (px < (jx - ix) * (py - iy) / (jy - iy) + ix)) {
+                            inside = !inside;
+                        }
+                    }
+                    return inside;
+                }
+
+                function onLocationFound(pos) {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    const acc = pos.coords.accuracy;
+
+                    gpsDot.className = 'dot dot-found';
+                    gpsStatus.textContent = `Lokalizacja znaleziona (±${Math.round(acc)}m)`;
+
+                    if (userMarker) {
+                        userMarker.setLatLng([lat, lng]);
+                        userCircle.setLatLng([lat, lng]).setRadius(acc);
+                    } else {
+                        userMarker = L.circleMarker([lat, lng], {
+                            radius: 8,
+                            color: '#2196F3',
+                            fillColor: '#2196F3',
+                            fillOpacity: 0.9,
+                            weight: 3
+                        }).addTo(map).bindPopup('Twoja lokalizacja');
+
+                        userCircle = L.circle([lat, lng], {
+                            radius: acc,
+                            color: '#2196F3',
+                            fillColor: '#2196F3',
+                            fillOpacity: 0.08,
+                            weight: 1
+                        }).addTo(map);
+                    }
+
+                    const inside = isPointInPolygon([lat, lng], latlngs);
+                    statusBar.className = 'region-status ' + (inside ? 'status-inside' : 'status-outside');
+                    statusBar.textContent = inside
+                        ? '✅ Jesteś w granicach tego terenu'
+                        : '⚠️ Jesteś poza granicami tego terenu';
+
+                    const cLat = window.terenCenter.lat;
+                    const cLng = window.terenCenter.lng;
+                    const navBtn = document.getElementById('btn-navigate');
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                    navBtn.href = isIOS
+                        ? `https://maps.apple.com/?saddr=${lat},${lng}&daddr=${cLat},${cLng}&dirflg=d`
+                        : `https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination=${cLat},${cLng}&travelmode=driving`;
+                }
+
+                function onLocationError(err) {
+                    gpsDot.className = 'dot dot-error';
+                    gpsStatus.textContent = 'Nie udało się pobrać lokalizacji';
+                }
+
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(onLocationFound, onLocationError,
+                        { enableHighAccuracy: true, timeout: 10000 });
+                    navigator.geolocation.watchPosition(onLocationFound, onLocationError,
+                        { enableHighAccuracy: true, maximumAge: 5000 });
+                } else {
+                    gpsDot.className = 'dot dot-error';
+                    gpsStatus.textContent = 'Geolokalizacja niedostępna';
                 }
             }
-            return inside;
-        }
 
-        function onLocationFound(pos) {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            const acc = pos.coords.accuracy;
-
-            gpsDot.className = 'dot dot-found';
-            gpsStatus.textContent = `Lokalizacja znaleziona (±${Math.round(acc)}m)`;
-
-            if (userMarker) {
-                userMarker.setLatLng([lat, lng]);
-                userCircle.setLatLng([lat, lng]).setRadius(acc);
-            } else {
-                userMarker = L.circleMarker([lat, lng], {
-                    radius: 8,
-                    color: '#2196F3',
-                    fillColor: '#2196F3',
-                    fillOpacity: 0.9,
-                    weight: 3
-                }).addTo(map).bindPopup('Twoja lokalizacja');
-
-                userCircle = L.circle([lat, lng], {
-                    radius: acc,
-                    color: '#2196F3',
-                    fillColor: '#2196F3',
-                    fillOpacity: 0.08,
-                    weight: 1
-                }).addTo(map);
-            }
-
-            const inside = isPointInPolygon([lat, lng], latlngs);
-            statusBar.className = 'region-status ' + (inside ? 'status-inside' : 'status-outside');
-            statusBar.textContent = inside
-                ? '✅ Jesteś w granicach tego terenu'
-                : '⚠️ Jesteś poza granicami tego terenu';
-
-            const cLat = window.terenCenter.lat;
-            const cLng = window.terenCenter.lng;
-            const navBtn = document.getElementById('btn-navigate');
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-            navBtn.href = isIOS
-                ? `https://maps.apple.com/?saddr=${lat},${lng}&daddr=${cLat},${cLng}&dirflg=d`
-                : `https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination=${cLat},${cLng}&travelmode=driving`;
-        }
-
-        function onLocationError(err) {
-            gpsDot.className = 'dot dot-error';
-            gpsStatus.textContent = 'Nie udało się pobrać lokalizacji';
-        }
-
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(onLocationFound, onLocationError, 
-                { enableHighAccuracy: true, timeout: 10000 });
-            navigator.geolocation.watchPosition(onLocationFound, onLocationError, 
-                { enableHighAccuracy: true, maximumAge: 5000 });
-        } else {
-            gpsDot.className = 'dot dot-error';
-            gpsStatus.textContent = 'Geolokalizacja niedostępna';
-        }
-    }
-
-})();
-</script>
+        })();
+    </script>
 
 </body>
+
 </html>

@@ -74,7 +74,6 @@
             font-size: 13px;
             font-family: 'Courier New', monospace;
             resize: vertical;
-            transition: border-color 0.2s;
         }
 
         textarea:focus {
@@ -129,16 +128,10 @@
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.2s;
         }
 
         .btn:hover {
             background: #34495e;
-        }
-
-        .btn:disabled {
-            background: #95a5a6;
-            cursor: not-allowed;
         }
 
         .btn-success {
@@ -241,14 +234,6 @@
             margin-bottom: 6px;
         }
 
-        code {
-            background: #f8f9fa;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-        }
-
         .checkbox-row {
             display: flex;
             align-items: center;
@@ -290,13 +275,8 @@
 
             <div class="section">
                 <h2>1. Wklej GeoJSON</h2>
-                <textarea id="input-geojson" rows="12" placeholder='Wklej tutaj GeoJSON z uMap, geojson.io lub OSM...
-
-Przykład:
-{
-  "type": "FeatureCollection",
-  "features": [...]
-}'></textarea>
+                <textarea id="input-geojson" rows="12"
+                    placeholder='Wklej tutaj GeoJSON z uMap, geojson.io lub OSM...'></textarea>
             </div>
 
             <div class="section">
@@ -315,19 +295,21 @@ Przykład:
 
                 <div class="checkbox-row">
                     <input type="checkbox" id="auto-id-from-name" checked>
-                    <label for="auto-id-from-name">Automatycznie wyciągnij ID z nazwy (np. "157 Gorzków" → ID:
-                        "157")</label>
+                    <label for="auto-id-from-name">Wyciągnij ID z nazwy (np. "157 Gorzków" → ID: "157")</label>
                 </div>
 
                 <div class="checkbox-row">
                     <input type="checkbox" id="add-timestamp" checked>
                     <label for="add-timestamp">Dodaj timestamp utworzenia</label>
                 </div>
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="round-coords" checked>
+                    <label for="round-coords">Zaokrąglij współrzędne do 5 miejsc (~1m dokładność)</label>
+                </div>
             </div>
 
-            <button class="btn" id="btn-convert">
-                🔄 Konwertuj
-            </button>
+            <button class="btn" id="btn-convert">🔄 Konwertuj</button>
 
             <div id="result" style="display: none;"></div>
         </div>
@@ -336,69 +318,46 @@ Przykład:
     <script>
         (function () {
 
-            // ============================================================
-            // SYNCHRONIZACJA KOLORÓW
-            // ============================================================
+            const COORD_PRECISION = 5;
             const colorPicker = document.getElementById('default-color');
             const colorHex = document.getElementById('default-color-hex');
 
-            colorPicker.addEventListener('input', function () {
-                colorHex.value = this.value;
-            });
-
+            colorPicker.addEventListener('input', function () { colorHex.value = this.value; });
             colorHex.addEventListener('input', function () {
-                if (/^#[0-9A-Fa-f]{6}$/i.test(this.value)) {
-                    colorPicker.value = this.value;
-                }
+                if (/^#[0-9A-Fa-f]{6}$/i.test(this.value)) colorPicker.value = this.value;
             });
 
-            // ============================================================
-            // KONWERSJA
-            // ============================================================
             document.getElementById('btn-convert').addEventListener('click', function () {
                 const input = document.getElementById('input-geojson').value.trim();
 
-                if (!input) {
-                    showError('Wklej GeoJSON do konwersji!');
-                    return;
-                }
+                if (!input) { showError('Wklej GeoJSON do konwersji!'); return; }
 
                 let inputGeoJson;
-                try {
-                    inputGeoJson = JSON.parse(input);
-                } catch (e) {
-                    showError('Nieprawidłowy JSON: ' + e.message);
-                    return;
+                try { inputGeoJson = JSON.parse(input); } catch (e) {
+                    showError('Nieprawidłowy JSON: ' + e.message); return;
                 }
 
                 if (inputGeoJson.type !== 'FeatureCollection' || !Array.isArray(inputGeoJson.features)) {
-                    showError('GeoJSON musi być typu FeatureCollection z tablicą features.');
-                    return;
+                    showError('GeoJSON musi być typu FeatureCollection z tablicą features.'); return;
                 }
 
-                const defaultColor = colorPicker.value;
-                const autoIdFromName = document.getElementById('auto-id-from-name').checked;
-                const addTimestamp = document.getElementById('add-timestamp').checked;
-
-                const converted = convertGeoJson(inputGeoJson, defaultColor, autoIdFromName, addTimestamp);
+                const converted = convertGeoJson(
+                    inputGeoJson,
+                    colorPicker.value,
+                    document.getElementById('auto-id-from-name').checked,
+                    document.getElementById('add-timestamp').checked,
+                    document.getElementById('round-coords').checked
+                );
 
                 showResult(converted);
             });
 
-            // ============================================================
-            // GŁÓWNA FUNKCJA KONWERSJI
-            // ============================================================
-            function convertGeoJson(inputGeoJson, defaultColor, autoIdFromName, addTimestamp) {
-                const output = {
-                    type: 'FeatureCollection',
-                    features: []
-                };
-
+            function convertGeoJson(inputGeoJson, defaultColor, autoIdFromName, addTimestamp, roundCoords) {
+                const output = { type: 'FeatureCollection', features: [] };
                 const usedIds = new Set();
                 let autoIdCounter = 1;
 
-                inputGeoJson.features.forEach((feature, index) => {
-                    // Tylko wielokąty
+                inputGeoJson.features.forEach(feature => {
                     if (!feature.geometry ||
                         (feature.geometry.type !== 'Polygon' && feature.geometry.type !== 'MultiPolygon')) {
                         return;
@@ -406,39 +365,29 @@ Przykład:
 
                     const props = feature.properties || {};
 
-                    // --- WYCIĄGNIJ ID Z NAZWY ---
+                    // --- ID ---
                     let id = null;
-
                     if (autoIdFromName && props.name) {
                         id = String(props.name).split(' ')[0];
                     }
-
-                    // Fallback: auto numeracja
                     while (!id || usedIds.has(id)) {
                         id = String(autoIdCounter++);
                     }
                     usedIds.add(id);
 
-                    // --- WYCIĄGNIJ NAZWĘ ---
-                    let name = props.name
-                        || props.description
-                        || props.title
-                        || props.label
-                        || 'Teren ' + id;
+                    // --- NAZWA ---
+                    let name = props.name || props.title || props.description || props.label || 'Teren ' + id;
 
-                    // --- WYCIĄGNIJ KOLOR ---
-                    let color = props.color
-                        || props.fill
-                        || props['marker-color']
-                        || props.stroke
-                        || defaultColor;
+                    // --- OPIS ---
+                    let description = props.description || '';
 
-                    // Normalizuj kolor (usuń przezroczystość)
+                    // --- KOLOR ---
+                    let color = props.stroke || props.fill || props.color || props['marker-color'] || defaultColor;
                     if (color.length === 9 && color.startsWith('#')) {
                         color = color.substring(0, 7);
                     }
 
-                    // --- KONWERTUJ WIELOKĄT ---
+                    // --- WSPÓŁRZĘDNE ---
                     let coordinates;
                     if (feature.geometry.type === 'Polygon') {
                         coordinates = feature.geometry.coordinates;
@@ -446,19 +395,39 @@ Przykład:
                         coordinates = feature.geometry.coordinates[0];
                     }
 
-                    // --- ZBUDUJ FEATURE ---
+                    // Zaokrąglij współrzędne
+                    if (roundCoords) {
+                        coordinates = coordinates.map(ring =>
+                            ring.map(coord => [
+                                parseFloat(coord[0].toFixed(COORD_PRECISION)),
+                                parseFloat(coord[1].toFixed(COORD_PRECISION))
+                            ])
+                        );
+                    }
+
+                    // --- FEATURE ---
                     const newFeature = {
                         type: 'Feature',
-                        properties: {
-                            id: id,
-                            name: name,
-                            color: color
-                        },
+                        id: id,
                         geometry: {
                             type: 'Polygon',
                             coordinates: coordinates
+                        },
+                        properties: {
+                            id: id,
+                            title: name,
+                            name: name,
+                            stroke: color,
+                            "stroke-opacity": 1,
+                            "stroke-width": 3,
+                            fill: color,
+                            "fill-opacity": 0.15
                         }
                     };
+
+                    if (description) {
+                        newFeature.properties.description = description;
+                    }
 
                     if (addTimestamp) {
                         newFeature.properties.created = new Date().toISOString();
@@ -469,22 +438,18 @@ Przykład:
 
                 return output;
             }
-            // ============================================================
-            // WYŚWIETLANIE WYNIKU
-            // ============================================================
+
             function showResult(converted) {
                 const resultDiv = document.getElementById('result');
-
-                const totalFeatures = converted.features.length;
+                const total = converted.features.length;
                 const uniqueIds = new Set(converted.features.map(f => f.properties.id)).size;
 
                 resultDiv.innerHTML = `
             <div class="result-box">
                 <h3>✅ Konwersja zakończona</h3>
-                
                 <div class="stats">
                     <div class="stat-item">
-                        <div class="stat-value">${totalFeatures}</div>
+                        <div class="stat-value">${total}</div>
                         <div class="stat-label">Terenów</div>
                     </div>
                     <div class="stat-item">
@@ -492,38 +457,30 @@ Przykład:
                         <div class="stat-label">Unikalnych ID</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value">${JSON.stringify(converted).length}</div>
-                        <div class="stat-label">Znaków (rozmiar)</div>
+                        <div class="stat-value">${(JSON.stringify(converted).length / 1024).toFixed(1)} KB</div>
+                        <div class="stat-label">Rozmiar</div>
                     </div>
                 </div>
-
-                <h4 style="margin: 16px 0 8px; font-size: 14px; color: #2c3e50;">
-                    📋 Podgląd terenów:
-                </h4>
+                <h4 style="margin: 16px 0 8px; font-size: 14px; color: #2c3e50;">📋 Podgląd:</h4>
                 <div class="preview-list">
                     ${converted.features.map(f => `
                         <div class="preview-item">
                             <strong>${f.properties.id}</strong>
-                            <span style="color: ${f.properties.color}">■</span>
-                            ${f.properties.name}
+                            <span style="color: ${f.properties.stroke}">■</span>
+                            ${f.properties.title}
+                            ${f.properties.description ? `<br><em style="color:#888;font-size:11px;">${f.properties.description}</em>` : ''}
                         </div>
                     `).join('')}
                 </div>
-
                 <button class="btn btn-success" id="btn-download" style="margin-top: 16px; width: 100%;">
                     💾 Pobierz tereny.geojson
                 </button>
             </div>
         `;
-
                 resultDiv.style.display = 'block';
 
-                // Obsługa pobierania
                 document.getElementById('btn-download').addEventListener('click', function () {
-                    const blob = new Blob(
-                        [JSON.stringify(converted, null, 2)],
-                        { type: 'application/json' }
-                    );
+                    const blob = new Blob([JSON.stringify(converted, null, 2)], { type: 'application/json' });
                     const link = document.createElement('a');
                     link.download = 'tereny.geojson';
                     link.href = URL.createObjectURL(blob);
@@ -531,17 +488,9 @@ Przykład:
                 });
             }
 
-            // ============================================================
-            // WYŚWIETLANIE BŁĘDU
-            // ============================================================
             function showError(message) {
                 const resultDiv = document.getElementById('result');
-                resultDiv.innerHTML = `
-            <div class="error-box">
-                <strong>❌ Błąd</strong>
-                ${message}
-            </div>
-        `;
+                resultDiv.innerHTML = `<div class="error-box"><strong>❌ Błąd</strong>${message}</div>`;
                 resultDiv.style.display = 'block';
             }
 
