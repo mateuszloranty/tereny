@@ -34,7 +34,7 @@
             display: block; margin: 10px 0 4px; 
             font-weight: 600; font-size: 14px; 
         }
-        input[type="text"], input[type="url"], input[type="color"], input[type="number"] {
+        input[type="text"], input[type="url"], input[type="color"] {
             width: 100%; padding: 10px; border: 2px solid #ddd;
             border-radius: 8px; font-size: 14px;
         }
@@ -212,7 +212,7 @@
             gap: 10px;
             align-items: flex-end;
         }
-        .id-input-row > div:first-child { width: 100px; }
+        .id-input-row > div:first-child { width: 120px; }
         .id-input-row > div:last-child { flex: 1; }
 
         .btn-row {
@@ -252,7 +252,7 @@
         <div class="id-input-row">
             <div>
                 <label for="teren-id">ID:</label>
-                <input type="number" id="teren-id" value="1" min="1">
+                <input type="text" id="teren-id" value="1" placeholder="np. 158-A">
             </div>
             <div>
                 <label for="teren-name">Nazwa terenu:</label>
@@ -292,7 +292,7 @@
         <hr class="divider">
 
         <!-- URL-e -->
-        <h3>🔗 URL terenu (z bazy)</h3>
+        <h3>🔗 URL terenu</h3>
         <div id="url-output" class="output-box">—</div>
         <small class="url-hint">Do kodów QR i trwałych linków</small>
 
@@ -379,6 +379,16 @@
     }
 
     async function loadFromServer() {
+        // Pomiń fetch dla protokołu file://
+        if (window.location.protocol === 'file:') {
+            const localDb = loadFromLocalStorage();
+            if (localDb?.features?.length > 0) {
+                database = localDb;
+            }
+            updateSyncStatus('local');
+            return false;
+        }
+
         updateSyncStatus('loading');
         try {
             const response = await fetch(DB_FILENAME + '?t=' + Date.now());
@@ -508,14 +518,14 @@
     }
 
     function updateUrl() {
-        const id = document.getElementById('teren-id').value;
-        const name = document.getElementById('teren-name').value;
+        const id = document.getElementById('teren-id').value.trim();
+        const name = document.getElementById('teren-name').value.trim();
         const base = document.getElementById('base-url').value.replace(/\/$/, '');
 
         // URL z ID
-        document.getElementById('url-output').textContent = `${base}?id=${id}`;
+        document.getElementById('url-output').textContent = `${base}?id=${encodeURIComponent(id)}`;
 
-        // URL bezpośredni (poly)
+        // URL tymczasowy (poly)
         if (currentPolygon) {
             const latlngs = currentPolygon.getLatLngs()[0];
             const polyStr = latlngs.map(ll => `${ll.lat.toFixed(6)},${ll.lng.toFixed(6)}`).join(',');
@@ -527,8 +537,45 @@
     }
 
     function getNextId() {
-        if (database.features.length === 0) return 1;
-        return Math.max(...database.features.map(f => f.properties.id || 0)) + 1;
+        if (database.features.length === 0) return '1';
+        
+        // Znajdź największy numeryczny prefiks ID
+        const numericIds = database.features
+            .map(f => {
+                const match = String(f.properties.id).match(/^(\d+)/);
+                return match ? parseInt(match[1]) : 0;
+            })
+            .filter(n => !isNaN(n));
+        
+        if (numericIds.length === 0) return '1';
+        return String(Math.max(...numericIds) + 1);
+    }
+
+    // Sortowanie ID: numeryczne na początku, potem tekstowe
+    function sortFeatures() {
+        database.features.sort((a, b) => {
+            const aId = String(a.properties.id);
+            const bId = String(b.properties.id);
+            
+            // Wyciągnij część numeryczną
+            const aMatch = aId.match(/^(\d+)(.*)/);
+            const bMatch = bId.match(/^(\d+)(.*)/);
+            
+            if (aMatch && bMatch) {
+                const aNum = parseInt(aMatch[1]);
+                const bNum = parseInt(bMatch[1]);
+                if (aNum !== bNum) return aNum - bNum;
+                // Jeśli numery równe, sortuj po suffixie
+                return aMatch[2].localeCompare(bMatch[2]);
+            }
+            
+            // Numeryczne przed tekstowymi
+            if (aMatch && !bMatch) return -1;
+            if (!aMatch && bMatch) return 1;
+            
+            // Oba tekstowe
+            return aId.localeCompare(bId);
+        });
     }
 
     // ============================================================
@@ -602,12 +649,15 @@
     document.getElementById('btn-add-to-db').addEventListener('click', function() {
         if (!currentPolygon) return alert('Narysuj wielokąt!');
 
-        const id = parseInt(document.getElementById('teren-id').value);
+        const id = document.getElementById('teren-id').value.trim();
+        if (!id) return alert('Podaj ID terenu!');
+        
         const name = document.getElementById('teren-name').value.trim() || 'Teren ' + id;
 
-        const existing = database.features.findIndex(f => f.properties.id === id);
+        // Sprawdź duplikat (porównanie jako stringi)
+        const existing = database.features.findIndex(f => String(f.properties.id) === String(id));
         if (existing !== -1) {
-            if (!confirm(`ID ${id} istnieje. Nadpisać?`)) return;
+            if (!confirm(`ID "${id}" istnieje. Nadpisać?`)) return;
             database.features.splice(existing, 1);
         }
 
@@ -620,11 +670,11 @@
 
         database.features.push({
             type: 'Feature',
-            properties: { id, name, color: currentColor, created: new Date().toISOString() },
+            properties: { id: id, name: name, color: currentColor, created: new Date().toISOString() },
             geometry: { type: 'Polygon', coordinates: [coordinates] }
         });
 
-        database.features.sort((a, b) => a.properties.id - b.properties.id);
+        sortFeatures();
         saveToLocalStorage();
         updateSyncStatus('local');
         renderTerenList();
@@ -681,8 +731,8 @@
         const img = document.querySelector('#qr-output img');
         if (!img) return;
         const link = document.createElement('a');
-        const id = document.getElementById('teren-id').value;
-        const name = document.getElementById('teren-name').value;
+        const id = document.getElementById('teren-id').value.trim();
+        const name = document.getElementById('teren-name').value.trim();
         link.download = `QR_${id}_${name.replace(/\s+/g, '_')}.png`;
         link.href = img.src;
         link.click();
@@ -717,17 +767,17 @@
         list.querySelectorAll('.teren-item').forEach(item => {
             item.addEventListener('click', function(e) {
                 if (e.target.classList.contains('action-btn')) return;
-                showTerenOnMap(parseInt(this.dataset.id));
+                showTerenOnMap(this.dataset.id);
             });
         });
 
         list.querySelectorAll('.action-btn.delete').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
-                const id = parseInt(this.dataset.id);
-                const t = database.features.find(f => f.properties.id === id);
+                const id = this.dataset.id;
+                const t = database.features.find(f => String(f.properties.id) === String(id));
                 if (confirm(`Usunąć "${t.properties.name}"?`)) {
-                    database.features = database.features.filter(f => f.properties.id !== id);
+                    database.features = database.features.filter(f => String(f.properties.id) !== String(id));
                     saveToLocalStorage();
                     updateSyncStatus('local');
                     renderTerenList();
@@ -739,9 +789,9 @@
         list.querySelectorAll('.action-btn.qr').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
-                const id = parseInt(this.dataset.id);
-                const t = database.features.find(f => f.properties.id === id);
-                document.getElementById('teren-id').value = id;
+                const id = this.dataset.id;
+                const t = database.features.find(f => String(f.properties.id) === String(id));
+                document.getElementById('teren-id').value = t.properties.id;
                 document.getElementById('teren-name').value = t.properties.name;
                 colorPicker.value = t.properties.color || '#e74c3c';
                 colorHex.value = t.properties.color || '#e74c3c';
@@ -754,7 +804,7 @@
     }
 
     function showTerenOnMap(id) {
-        const teren = database.features.find(f => f.properties.id === id);
+        const teren = database.features.find(f => String(f.properties.id) === String(id));
         if (!teren) return;
 
         const coords = teren.geometry.coordinates[0];

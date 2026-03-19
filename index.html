@@ -124,7 +124,6 @@
         .message.error { color: #e74c3c; }
         .message h2 { margin-bottom: 10px; }
 
-        /* Badge dla trybu tymczasowego */
         .temp-badge {
             display: inline-block;
             background: #f39c12;
@@ -186,12 +185,9 @@
     const paramName = params.get('name');
     const paramColor = params.get('color');
 
-    // Decyzja: skąd wczytać dane?
     if (terenId) {
-        // Tryb bazy danych
-        loadFromDatabase(parseInt(terenId));
+        loadFromDatabase(terenId.trim());
     } else if (polyStr) {
-        // Tryb bezpośredni (poly w URL)
         loadFromPolyParam(polyStr, paramName, paramColor);
     } else {
         showError('Brak parametru <code>id</code> lub <code>poly</code> w adresie URL.');
@@ -207,13 +203,13 @@
                 return response.json();
             })
             .then(geojson => {
-                const teren = geojson.features?.find(f => f.properties?.id === id);
+                // Porównuj jako stringi
+                const teren = geojson.features?.find(f => String(f.properties?.id) === String(id));
                 if (!teren) {
                     showError(`Nie znaleziono terenu o ID: ${id}`);
                     return;
                 }
                 
-                // Konwersja GeoJSON [lng, lat] → Leaflet [lat, lng]
                 const coords = teren.geometry.coordinates[0];
                 const latlngs = coords.map(c => [c[1], c[0]]);
                 const name = teren.properties.name || 'Teren ' + id;
@@ -249,7 +245,7 @@
             latlngs, 
             name || 'Teren tymczasowy', 
             color || '#e74c3c',
-            true // isTemporary
+            true
         );
     }
 
@@ -268,7 +264,6 @@
     // 5. INICJALIZACJA MAPY
     // ============================================================
     function initMap(latlngs, name, color, isTemporary) {
-        // Aktualizuj nagłówek
         const titleEl = document.getElementById('region-name');
         titleEl.textContent = name;
         if (isTemporary) {
@@ -280,11 +275,9 @@
         document.documentElement.style.setProperty('--poly-color', color);
         document.getElementById('legend-color').style.color = color;
 
-        // Środek geometryczny
         const centerLat = latlngs.reduce((s, c) => s + c[0], 0) / latlngs.length;
         const centerLng = latlngs.reduce((s, c) => s + c[1], 0) / latlngs.length;
 
-        // Mapa
         const map = L.map('map', {
             zoomControl: true,
             attributionControl: false
@@ -295,7 +288,6 @@
             attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        // Wielokąt
         const polygon = L.polygon(latlngs, {
             color: color,
             fillColor: color,
@@ -304,7 +296,6 @@
             dashArray: isTemporary ? '10, 5' : null
         }).addTo(map);
 
-        // Marker środka
         L.circleMarker([centerLat, centerLng], {
             radius: 6,
             color: color,
@@ -314,7 +305,6 @@
 
         map.fitBounds(polygon.getBounds(), { padding: [40, 40] });
 
-        // Deep linki i GPS
         setupDeepLinks(centerLat, centerLng, name);
         setupGeolocation(map, latlngs, centerLat, centerLng);
     }
@@ -401,7 +391,6 @@
                 ? '✅ Jesteś w granicach tego terenu'
                 : '⚠️ Jesteś poza granicami tego terenu';
 
-            // Aktualizuj nawigację
             const cLat = window.terenCenter.lat;
             const cLng = window.terenCenter.lng;
             const navBtn = document.getElementById('btn-navigate');
