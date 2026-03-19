@@ -1,16 +1,25 @@
 <!DOCTYPE html>
 <html lang="pl">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Generator terenów</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f0f2f5;
+        }
 
         .container {
             display: grid;
@@ -18,7 +27,9 @@
             height: 100vh;
         }
 
-        #map { height: 100%; }
+        #map {
+            height: 100%;
+        }
 
         .panel {
             padding: 20px;
@@ -27,58 +38,138 @@
             border-left: 2px solid #e0e0e0;
         }
 
-        h2 { margin-bottom: 16px; color: #2c3e50; }
-        h3 { margin: 16px 0 8px; color: #34495e; font-size: 15px; }
+        h2 {
+            margin-bottom: 16px;
+            color: #2c3e50;
+        }
 
-        label { 
-            display: block; margin: 10px 0 4px; 
-            font-weight: 600; font-size: 14px; 
+        h3 {
+            margin: 16px 0 8px;
+            color: #34495e;
+            font-size: 15px;
         }
-        input[type="text"], input[type="url"], input[type="color"] {
-            width: 100%; padding: 10px; border: 2px solid #ddd;
-            border-radius: 8px; font-size: 14px;
+
+        label {
+            display: block;
+            margin: 10px 0 4px;
+            font-weight: 600;
+            font-size: 14px;
         }
-        input[type="color"] { height: 44px; cursor: pointer; }
-        input:focus { border-color: #3498db; outline: none; }
+
+        input[type="text"],
+        input[type="url"],
+        input[type="color"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        input[type="color"] {
+            height: 44px;
+            cursor: pointer;
+        }
+
+        input:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+
         textarea {
-            width: 100%; padding: 10px; border: 2px solid #ddd;
-            border-radius: 8px; font-size: 13px; font-family: monospace;
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: monospace;
             resize: vertical;
         }
-        textarea:focus { border-color: #3498db; outline: none; }
+
+        textarea:focus {
+            border-color: #3498db;
+            outline: none;
+        }
 
         .btn-primary {
-            display: block; width: 100%; padding: 12px;
-            background: #2c3e50; color: white; border: none;
-            border-radius: 8px; font-size: 16px; cursor: pointer;
-            margin-top: 12px; font-weight: 600;
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 12px;
+            font-weight: 600;
         }
-        .btn-primary:hover { background: #34495e; }
-        .btn-primary:disabled { background: #95a5a6; cursor: not-allowed; }
 
-        .btn-success { background: #27ae60; }
-        .btn-success:hover { background: #1e8449; }
+        .btn-primary:hover {
+            background: #34495e;
+        }
+
+        .btn-primary:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:hover {
+            background: #1e8449;
+        }
 
         .btn-secondary {
-            display: block; width: 100%; padding: 10px;
-            background: #ecf0f1; color: #2c3e50; border: 2px solid #bdc3c7;
-            border-radius: 8px; font-size: 14px; cursor: pointer;
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background: #ecf0f1;
+            color: #2c3e50;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
             margin-top: 8px;
         }
-        .btn-secondary:hover { background: #dfe6e9; }
 
-        .btn-import { background: #3498db; color: white; border: none; }
-        .btn-import:hover { background: #2980b9; }
+        .btn-secondary:hover {
+            background: #dfe6e9;
+        }
 
-        .btn-danger { background: #e74c3c; color: white; border: none; }
-        .btn-danger:hover { background: #c0392b; }
+        .btn-import {
+            background: #3498db;
+            color: white;
+            border: none;
+        }
+
+        .btn-import:hover {
+            background: #2980b9;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+            border: none;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
 
         .output-box {
-            background: #f8f9fa; border: 2px solid #e0e0e0;
-            border-radius: 8px; padding: 12px;
-            word-break: break-all; font-family: monospace;
-            font-size: 11px; margin-top: 8px;
-            max-height: 50px; overflow-y: auto;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 11px;
+            margin-top: 8px;
+            max-height: 50px;
+            overflow-y: auto;
         }
 
         .url-hint {
@@ -92,9 +183,10 @@
             text-align: center;
             margin-top: 16px;
         }
-        #qr-output img { 
-            border: 8px solid white; 
-            box-shadow: 0 2px 12px rgba(0,0,0,0.1); 
+
+        #qr-output img {
+            border: 8px solid white;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
         }
 
         .tabs {
@@ -105,6 +197,7 @@
             overflow: hidden;
             border: 2px solid #3498db;
         }
+
         .tab {
             flex: 1;
             padding: 12px 10px;
@@ -116,9 +209,19 @@
             color: #3498db;
             transition: all 0.2s;
         }
-        .tab:first-child { border-right: 2px solid #3498db; }
-        .tab.active { background: #3498db; color: white; }
-        .tab:hover:not(.active) { background: #ebf5fb; }
+
+        .tab:first-child {
+            border-right: 2px solid #3498db;
+        }
+
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            background: #ebf5fb;
+        }
 
         .tab-content {
             display: none;
@@ -127,7 +230,10 @@
             border-radius: 8px;
             margin-bottom: 12px;
         }
-        .tab-content.active { display: block; }
+
+        .tab-content.active {
+            display: block;
+        }
 
         .instructions {
             background: #eaf4fc;
@@ -138,16 +244,31 @@
             line-height: 1.6;
             margin-bottom: 12px;
         }
-        .instructions.geojson { background: #fef9e7; border-color: #f9e79f; }
-        .instructions.warning { background: #fff3cd; border-color: #ffc107; }
+
+        .instructions.geojson {
+            background: #fef9e7;
+            border-color: #f9e79f;
+        }
+
+        .instructions.warning {
+            background: #fff3cd;
+            border-color: #ffc107;
+        }
 
         .color-row {
             display: flex;
             gap: 10px;
             align-items: center;
         }
-        .color-row input[type="color"] { width: 60px; flex-shrink: 0; }
-        .color-row input[type="text"] { flex: 1; }
+
+        .color-row input[type="color"] {
+            width: 60px;
+            flex-shrink: 0;
+        }
+
+        .color-row input[type="text"] {
+            flex: 1;
+        }
 
         .error-msg {
             color: #e74c3c;
@@ -171,7 +292,10 @@
             margin: 20px 0;
         }
 
-        .teren-list { margin-top: 12px; }
+        .teren-list {
+            margin-top: 12px;
+        }
+
         .teren-item {
             background: #f8f9fa;
             border: 1px solid #e0e0e0;
@@ -183,9 +307,22 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        .teren-item:hover { border-color: #3498db; background: #ebf5fb; }
-        .teren-item.selected { border-color: #27ae60; border-width: 2px; background: #d4edda; }
-        .teren-item strong { color: #2c3e50; }
+
+        .teren-item:hover {
+            border-color: #3498db;
+            background: #ebf5fb;
+        }
+
+        .teren-item.selected {
+            border-color: #27ae60;
+            border-width: 2px;
+            background: #d4edda;
+        }
+
+        .teren-item strong {
+            color: #2c3e50;
+        }
+
         .teren-item .teren-actions {
             position: absolute;
             top: 8px;
@@ -193,6 +330,7 @@
             display: flex;
             gap: 4px;
         }
+
         .teren-item .action-btn {
             background: #95a5a6;
             color: white;
@@ -202,24 +340,44 @@
             font-size: 11px;
             cursor: pointer;
         }
-        .teren-item .action-btn.delete { background: #e74c3c; }
-        .teren-item .action-btn.qr { background: #3498db; }
 
-        .teren-count { font-size: 12px; color: #666; margin-bottom: 8px; }
+        .teren-item .action-btn.delete {
+            background: #e74c3c;
+        }
+
+        .teren-item .action-btn.qr {
+            background: #3498db;
+        }
+
+        .teren-count {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
 
         .id-input-row {
             display: flex;
             gap: 10px;
             align-items: flex-end;
         }
-        .id-input-row > div:first-child { width: 120px; }
-        .id-input-row > div:last-child { flex: 1; }
+
+        .id-input-row>div:first-child {
+            width: 120px;
+        }
+
+        .id-input-row>div:last-child {
+            flex: 1;
+        }
 
         .btn-row {
             display: flex;
             gap: 8px;
         }
-        .btn-row .btn-secondary { flex: 1; margin-top: 0; }
+
+        .btn-row .btn-secondary {
+            flex: 1;
+            margin-top: 0;
+        }
 
         .sync-status {
             font-size: 12px;
@@ -227,532 +385,569 @@
             border-radius: 6px;
             margin-bottom: 12px;
         }
-        .sync-status.synced { background: #d4edda; color: #155724; }
-        .sync-status.local { background: #fff3cd; color: #856404; }
-        .sync-status.loading { background: #e2e3e5; color: #383d41; }
+
+        .sync-status.synced {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .sync-status.local {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .sync-status.loading {
+            background: #e2e3e5;
+            color: #383d41;
+        }
     </style>
 </head>
+
 <body>
 
-<div class="container">
-    <div id="map"></div>
+    <div class="container">
+        <div id="map"></div>
 
-    <div class="panel">
-        <h2>🗺️ Generator terenów</h2>
+        <div class="panel">
+            <h2>🗺️ Generator terenów</h2>
 
-        <div id="sync-status" class="sync-status loading">
-            ⏳ Wczytuję bazę z serwera...
-        </div>
-
-        <div class="instructions warning">
-            <strong>⚠️ Workflow:</strong> Dodaj tereny → Eksportuj bazę → Wgraj <code>tereny.geojson</code> na hosting
-        </div>
-
-        <!-- ID i nazwa -->
-        <div class="id-input-row">
-            <div>
-                <label for="teren-id">ID:</label>
-                <input type="text" id="teren-id" value="1" placeholder="np. 158-A">
+            <div id="sync-status" class="sync-status loading">
+                ⏳ Wczytuję bazę z serwera...
             </div>
-            <div>
-                <label for="teren-name">Nazwa terenu:</label>
-                <input type="text" id="teren-name" placeholder="np. Osiedle Centralne" value="Teren 1">
+
+            <div class="instructions warning">
+                <strong>⚠️ Workflow:</strong> Dodaj tereny → Eksportuj bazę → Wgraj <code>tereny.geojson</code> na
+                hosting
             </div>
-        </div>
 
-        <label for="base-url">Bazowy URL:</label>
-        <input type="url" id="base-url" value="">
-
-        <label>Kolor terenu:</label>
-        <div class="color-row">
-            <input type="color" id="teren-color" value="#e74c3c">
-            <input type="text" id="teren-color-hex" value="#e74c3c">
-        </div>
-
-        <!-- Zakładki -->
-        <div class="tabs">
-            <button class="tab active" data-tab="draw">✏️ Rysuj</button>
-            <button class="tab" data-tab="import">📥 GeoJSON</button>
-        </div>
-
-        <div class="tab-content active" id="tab-draw">
-            <div class="instructions">
-                Kliknij 🔷 na mapie → rysuj wierzchołki → zamknij klikając pierwszy punkt
+            <!-- ID i nazwa -->
+            <div class="id-input-row">
+                <div>
+                    <label for="teren-id">ID:</label>
+                    <input type="text" id="teren-id" value="1" placeholder="np. 158-A">
+                </div>
+                <div>
+                    <label for="teren-name">Nazwa terenu:</label>
+                    <input type="text" id="teren-name" placeholder="np. Osiedle Centralne" value="Teren 1">
+                </div>
             </div>
-            <button class="btn-secondary" id="btn-clear-polygon">🗑️ Wyczyść wielokąt</button>
-        </div>
 
-        <div class="tab-content" id="tab-import">
-            <textarea id="geojson-input" rows="4" placeholder='Wklej GeoJSON z geojson.io...'></textarea>
-            <button class="btn-secondary btn-import" id="btn-import-geojson">📥 Importuj</button>
-            <div id="import-error" class="error-msg"></div>
-            <div id="import-success" class="success-msg"></div>
-        </div>
+            <label for="base-url">Bazowy URL:</label>
+            <input type="url" id="base-url" value="">
 
-        <hr class="divider">
+            <label>Kolor terenu:</label>
+            <div class="color-row">
+                <input type="color" id="teren-color" value="#e74c3c">
+                <input type="text" id="teren-color-hex" value="#e74c3c">
+            </div>
 
-        <!-- URL-e -->
-        <h3>🔗 URL terenu</h3>
-        <div id="url-output" class="output-box">—</div>
-        <small class="url-hint">Do kodów QR i trwałych linków</small>
+            <!-- Zakładki -->
+            <div class="tabs">
+                <button class="tab active" data-tab="draw">✏️ Rysuj</button>
+                <button class="tab" data-tab="import">📥 GeoJSON</button>
+            </div>
 
-        <h3 style="margin-top: 12px;">🔗 URL tymczasowy</h3>
-        <div id="url-poly-output" class="output-box">—</div>
-        <small class="url-hint">Do szybkich testów, bez zapisywania</small>
+            <div class="tab-content active" id="tab-draw">
+                <div class="instructions">
+                    Kliknij 🔷 na mapie → rysuj wierzchołki → zamknij klikając pierwszy punkt
+                </div>
+                <button class="btn-secondary" id="btn-clear-polygon">🗑️ Wyczyść wielokąt</button>
+            </div>
 
-        <!-- Przyciski -->
-        <button class="btn-primary btn-success" id="btn-add-to-db" disabled>
-            ➕ Dodaj teren do bazy
-        </button>
+            <div class="tab-content" id="tab-import">
+                <textarea id="geojson-input" rows="4" placeholder='Wklej GeoJSON z geojson.io...'></textarea>
+                <button class="btn-secondary btn-import" id="btn-import-geojson">📥 Importuj</button>
+                <div id="import-error" class="error-msg"></div>
+                <div id="import-success" class="success-msg"></div>
+            </div>
 
-        <div class="btn-row" style="margin-top: 8px;">
-            <button class="btn-secondary" id="btn-generate-qr" disabled>📱 QR</button>
-            <button class="btn-secondary" id="btn-copy-url" disabled>📋 URL</button>
-            <button class="btn-secondary" id="btn-copy-poly-url" disabled>📋 Tymczasowy</button>
-        </div>
+            <hr class="divider">
 
-        <div id="qr-output"></div>
-        <button class="btn-secondary" id="btn-download-qr" style="display:none;">💾 Pobierz QR</button>
+            <!-- URL-e -->
+            <h3>🔗 URL terenu</h3>
+            <div id="url-output" class="output-box">—</div>
+            <small class="url-hint">Do kodów QR i trwałych linków</small>
 
-        <hr class="divider">
+            <h3 style="margin-top: 12px;">🔗 URL tymczasowy</h3>
+            <div id="url-poly-output" class="output-box">—</div>
+            <small class="url-hint">Do szybkich testów, bez zapisywania</small>
 
-        <!-- Baza -->
-        <h3>📋 Baza terenów</h3>
-        <div class="teren-count" id="teren-count">Liczba terenów: 0</div>
+            <!-- Przyciski -->
+            <button class="btn-primary btn-success" id="btn-add-to-db" disabled>
+                ➕ Dodaj teren do bazy
+            </button>
 
-        <div class="btn-row">
-            <button class="btn-secondary" id="btn-load-server">🔄 Z serwera</button>
-            <button class="btn-secondary" id="btn-export-db">💾 Eksportuj</button>
-        </div>
+            <div class="btn-row" style="margin-top: 8px;">
+                <button class="btn-secondary" id="btn-generate-qr" disabled>📱 QR</button>
+                <button class="btn-secondary" id="btn-copy-url" disabled>📋 URL</button>
+                <button class="btn-secondary" id="btn-copy-poly-url" disabled>📋 Tymczasowy</button>
+            </div>
 
-        <button class="btn-secondary btn-danger" id="btn-clear-db" style="margin-top: 8px;">
-            🗑️ Wyczyść bazę
-        </button>
+            <div id="qr-output"></div>
+            <button class="btn-secondary" id="btn-download-qr" style="display:none;">💾 Pobierz QR</button>
 
-        <div id="teren-list" class="teren-list">
-            <em style="font-size:13px;color:#999;">Brak terenów</em>
+            <hr class="divider">
+
+            <!-- Baza -->
+            <h3>📋 Baza terenów</h3>
+            <div class="teren-count" id="teren-count">Liczba terenów: 0</div>
+
+            <div class="btn-row">
+                <button class="btn-secondary" id="btn-load-server">🔄 Z serwera</button>
+                <button class="btn-secondary" id="btn-export-db">💾 Eksportuj</button>
+            </div>
+
+            <button class="btn-secondary btn-danger" id="btn-clear-db" style="margin-top: 8px;">
+                🗑️ Wyczyść bazę
+            </button>
+
+            <div id="teren-list" class="teren-list">
+                <em style="font-size:13px;color:#999;">Brak terenów</em>
+            </div>
         </div>
     </div>
-</div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
-<script>
-(function() {
+    <script>
+        (function () {
 
-    // ============================================================
-    // KONFIGURACJA
-    // ============================================================
-    const DB_FILENAME = 'tereny.geojson';
-    const currentUrl = window.location.href;
-    const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
-    document.getElementById('base-url').value = baseUrl;
+            // ============================================================
+            // KONFIGURACJA
+            // ============================================================
+            const DB_FILENAME = 'tereny.geojson';
+            const currentUrl = window.location.href;
+            const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+            document.getElementById('base-url').value = baseUrl;
 
-    // ============================================================
-    // BAZA DANYCH
-    // ============================================================
-    let database = { type: 'FeatureCollection', features: [] };
+            // ============================================================
+            // BAZA DANYCH
+            // ============================================================
+            let database = { type: 'FeatureCollection', features: [] };
 
-    function loadFromLocalStorage() {
-        const stored = localStorage.getItem('terenyDB');
-        if (stored) {
-            try { return JSON.parse(stored); } catch (e) {}
-        }
-        return null;
-    }
-
-    function saveToLocalStorage() {
-        localStorage.setItem('terenyDB', JSON.stringify(database));
-    }
-
-    function updateSyncStatus(status) {
-        const el = document.getElementById('sync-status');
-        el.className = 'sync-status ' + status;
-        const msgs = {
-            synced: '✅ Baza zsynchronizowana z serwerem',
-            local: '⚠️ Zmiany lokalne — wyeksportuj i wgraj',
-            loading: '⏳ Wczytuję bazę...'
-        };
-        el.textContent = msgs[status] || '';
-    }
-
-    async function loadFromServer() {
-        // Pomiń fetch dla protokołu file://
-        if (window.location.protocol === 'file:') {
-            const localDb = loadFromLocalStorage();
-            if (localDb?.features?.length > 0) {
-                database = localDb;
+            function loadFromLocalStorage() {
+                const stored = localStorage.getItem('terenyDB');
+                if (stored) {
+                    try { return JSON.parse(stored); } catch (e) { }
+                }
+                return null;
             }
-            updateSyncStatus('local');
-            return false;
-        }
 
-        updateSyncStatus('loading');
-        try {
-            const response = await fetch(DB_FILENAME + '?t=' + Date.now());
-            if (response.ok) {
-                database = await response.json();
+            function saveToLocalStorage() {
+                localStorage.setItem('terenyDB', JSON.stringify(database));
+            }
+
+            function updateSyncStatus(status) {
+                const el = document.getElementById('sync-status');
+                el.className = 'sync-status ' + status;
+                const msgs = {
+                    synced: '✅ Baza zsynchronizowana z serwerem',
+                    local: '⚠️ Zmiany lokalne — wyeksportuj i wgraj',
+                    loading: '⏳ Wczytuję bazę...'
+                };
+                el.textContent = msgs[status] || '';
+            }
+
+            async function loadFromServer() {
+                if (window.location.protocol === 'file:') {
+                    console.log('[DB] Protokół file:// — pomijam fetch');
+                    const localDb = loadFromLocalStorage();
+                    if (localDb?.features?.length > 0) {
+                        database = localDb;
+                        console.log('[DB] Wczytano z localStorage:', database.features.length, 'terenów');
+                    }
+                    updateSyncStatus('local');
+                    return false;
+                }
+
+                updateSyncStatus('loading');
+                try {
+                    const url = DB_FILENAME + '?t=' + Date.now();
+                    console.log('[DB] Pobieram:', url);
+
+                    const response = await fetch(url);
+                    console.log('[DB] Status odpowiedzi:', response.status);
+
+                    if (response.ok) {
+                        const text = await response.text();
+                        console.log('[DB] Rozmiar odpowiedzi:', text.length, 'znaków');
+
+                        database = JSON.parse(text);
+                        console.log('[DB] Sparsowano:', database.features?.length, 'terenów');
+
+                        // Sprawdź pierwszy teren
+                        if (database.features?.length > 0) {
+                            const first = database.features[0];
+                            console.log('[DB] Pierwszy teren:', {
+                                id: first.properties?.id,
+                                name: first.properties?.name,
+                                coordsCount: first.geometry?.coordinates?.[0]?.length
+                            });
+                        }
+
+                        saveToLocalStorage();
+                        updateSyncStatus('synced');
+                        return true;
+                    }
+                    throw new Error('Status: ' + response.status);
+                } catch (e) {
+                    console.error('[DB] Błąd:', e);
+                    const localDb = loadFromLocalStorage();
+                    if (localDb?.features?.length > 0) {
+                        database = localDb;
+                        console.log('[DB] Fallback localStorage:', database.features.length, 'terenów');
+                    }
+                    updateSyncStatus('local');
+                    return false;
+                }
+            }
+
+            // ============================================================
+            // MAPA
+            // ============================================================
+            const map = L.map('map').setView([50.0, 20.0], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+            const drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+
+            const dbLayer = new L.FeatureGroup();
+            map.addLayer(dbLayer);
+
+            let currentColor = '#e74c3c';
+            let currentPolygon = null;
+
+            const drawControl = new L.Control.Draw({
+                draw: {
+                    polygon: { shapeOptions: { color: currentColor } },
+                    rectangle: { shapeOptions: { color: currentColor } },
+                    polyline: false, circle: false, marker: false, circlemarker: false
+                },
+                edit: { featureGroup: drawnItems }
+            });
+            map.addControl(drawControl);
+
+            // ============================================================
+            // ZDARZENIA MAPY
+            // ============================================================
+            map.on(L.Draw.Event.CREATED, function (e) {
+                drawnItems.clearLayers();
+                e.layer.setStyle({ color: currentColor, fillColor: currentColor, fillOpacity: 0.2 });
+                drawnItems.addLayer(e.layer);
+                currentPolygon = e.layer;
+                updateUrl();
+                enableButtons();
+            });
+
+            map.on(L.Draw.Event.EDITED, function () {
+                if (drawnItems.getLayers().length > 0) {
+                    currentPolygon = drawnItems.getLayers()[0];
+                    updateUrl();
+                }
+            });
+
+            map.on(L.Draw.Event.DELETED, function () {
+                currentPolygon = null;
+                clearOutputs();
+            });
+
+            // ============================================================
+            // ZAKŁADKI
+            // ============================================================
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function () {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    this.classList.add('active');
+                    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+                });
+            });
+
+            // ============================================================
+            // KOLOR
+            // ============================================================
+            const colorPicker = document.getElementById('teren-color');
+            const colorHex = document.getElementById('teren-color-hex');
+
+            colorPicker.addEventListener('input', function () {
+                colorHex.value = this.value;
+                currentColor = this.value;
+                if (currentPolygon) currentPolygon.setStyle({ color: currentColor, fillColor: currentColor });
+                updateUrl();
+            });
+
+            colorHex.addEventListener('input', function () {
+                if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
+                    colorPicker.value = this.value;
+                    currentColor = this.value;
+                    if (currentPolygon) currentPolygon.setStyle({ color: currentColor, fillColor: currentColor });
+                    updateUrl();
+                }
+            });
+
+            // ============================================================
+            // FUNKCJE POMOCNICZE
+            // ============================================================
+            function clearOutputs() {
+                document.getElementById('url-output').textContent = '—';
+                document.getElementById('url-poly-output').textContent = '—';
+                document.getElementById('qr-output').innerHTML = '';
+                document.getElementById('btn-download-qr').style.display = 'none';
+                disableButtons();
+            }
+
+            function enableButtons() {
+                document.getElementById('btn-add-to-db').disabled = false;
+                document.getElementById('btn-generate-qr').disabled = false;
+                document.getElementById('btn-copy-url').disabled = false;
+                document.getElementById('btn-copy-poly-url').disabled = false;
+            }
+
+            function disableButtons() {
+                document.getElementById('btn-add-to-db').disabled = true;
+                document.getElementById('btn-generate-qr').disabled = true;
+                document.getElementById('btn-copy-url').disabled = true;
+                document.getElementById('btn-copy-poly-url').disabled = true;
+            }
+
+            function updateUrl() {
+                const id = document.getElementById('teren-id').value.trim();
+                const name = document.getElementById('teren-name').value.trim();
+                const base = document.getElementById('base-url').value.replace(/\/$/, '');
+
+                // URL z ID
+                document.getElementById('url-output').textContent = `${base}?id=${encodeURIComponent(id)}`;
+
+                // URL tymczasowy (poly)
+                if (currentPolygon) {
+                    const latlngs = currentPolygon.getLatLngs()[0];
+                    const polyStr = latlngs.map(ll => `${ll.lat.toFixed(6)},${ll.lng.toFixed(6)}`).join(',');
+                    document.getElementById('url-poly-output').textContent =
+                        `${base}?name=${encodeURIComponent(name)}&poly=${polyStr}&color=${encodeURIComponent(currentColor)}`;
+                } else {
+                    document.getElementById('url-poly-output').textContent = '—';
+                }
+            }
+
+            function getNextId() {
+                if (database.features.length === 0) return '1';
+
+                // Znajdź największy numeryczny prefiks ID
+                const numericIds = database.features
+                    .map(f => {
+                        const match = String(f.properties.id).match(/^(\d+)/);
+                        return match ? parseInt(match[1]) : 0;
+                    })
+                    .filter(n => !isNaN(n));
+
+                if (numericIds.length === 0) return '1';
+                return String(Math.max(...numericIds) + 1);
+            }
+
+            // Sortowanie ID: numeryczne na początku, potem tekstowe
+            function sortFeatures() {
+                database.features.sort((a, b) => {
+                    const aId = String(a.properties.id);
+                    const bId = String(b.properties.id);
+
+                    // Wyciągnij część numeryczną
+                    const aMatch = aId.match(/^(\d+)(.*)/);
+                    const bMatch = bId.match(/^(\d+)(.*)/);
+
+                    if (aMatch && bMatch) {
+                        const aNum = parseInt(aMatch[1]);
+                        const bNum = parseInt(bMatch[1]);
+                        if (aNum !== bNum) return aNum - bNum;
+                        // Jeśli numery równe, sortuj po suffixie
+                        return aMatch[2].localeCompare(bMatch[2]);
+                    }
+
+                    // Numeryczne przed tekstowymi
+                    if (aMatch && !bMatch) return -1;
+                    if (!aMatch && bMatch) return 1;
+
+                    // Oba tekstowe
+                    return aId.localeCompare(bId);
+                });
+            }
+
+            // ============================================================
+            // IMPORT GEOJSON
+            // ============================================================
+            document.getElementById('btn-import-geojson').addEventListener('click', function () {
+                const errorDiv = document.getElementById('import-error');
+                const successDiv = document.getElementById('import-success');
+                errorDiv.style.display = 'none';
+                successDiv.style.display = 'none';
+
+                const input = document.getElementById('geojson-input').value.trim();
+                if (!input) {
+                    errorDiv.textContent = '❌ Wklej GeoJSON!';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                let geojson;
+                try { geojson = JSON.parse(input); } catch (e) {
+                    errorDiv.textContent = '❌ Błąd JSON';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                const coords = extractPolygonCoords(geojson);
+                if (!coords || coords.length < 3) {
+                    errorDiv.textContent = '❌ Nie znaleziono wielokąta';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                const latlngs = coords.map(c => [c[1], c[0]]);
+                drawnItems.clearLayers();
+
+                const polygon = L.polygon(latlngs, { color: currentColor, fillColor: currentColor, fillOpacity: 0.2 });
+                drawnItems.addLayer(polygon);
+                currentPolygon = polygon;
+                map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+                updateUrl();
+                enableButtons();
+
+                successDiv.textContent = '✅ Zaimportowano ' + latlngs.length + ' punktów';
+                successDiv.style.display = 'block';
+                document.querySelector('.tab[data-tab="draw"]').click();
+            });
+
+            function extractPolygonCoords(geojson) {
+                if (geojson.type === 'FeatureCollection' && geojson.features) {
+                    for (let f of geojson.features) {
+                        if (f.geometry?.type === 'Polygon') return f.geometry.coordinates[0];
+                        if (f.geometry?.type === 'MultiPolygon') return f.geometry.coordinates[0][0];
+                    }
+                } else if (geojson.type === 'Feature' && geojson.geometry?.type === 'Polygon') {
+                    return geojson.geometry.coordinates[0];
+                } else if (geojson.type === 'Polygon') {
+                    return geojson.coordinates[0];
+                }
+                return null;
+            }
+
+            // ============================================================
+            // PRZYCISKI
+            // ============================================================
+            document.getElementById('btn-clear-polygon').addEventListener('click', function () {
+                drawnItems.clearLayers();
+                currentPolygon = null;
+                clearOutputs();
+            });
+
+            document.getElementById('btn-add-to-db').addEventListener('click', function () {
+                if (!currentPolygon) return alert('Narysuj wielokąt!');
+
+                const id = document.getElementById('teren-id').value.trim();
+                if (!id) return alert('Podaj ID terenu!');
+
+                const name = document.getElementById('teren-name').value.trim() || 'Teren ' + id;
+
+                // Sprawdź duplikat (porównanie jako stringi)
+                const existing = database.features.findIndex(f => String(f.properties.id) === String(id));
+                if (existing !== -1) {
+                    if (!confirm(`ID "${id}" istnieje. Nadpisać?`)) return;
+                    database.features.splice(existing, 1);
+                }
+
+                const latlngs = currentPolygon.getLatLngs()[0];
+                const coordinates = latlngs.map(ll => [ll.lng, ll.lat]);
+                if (coordinates[0][0] !== coordinates[coordinates.length - 1][0] ||
+                    coordinates[0][1] !== coordinates[coordinates.length - 1][1]) {
+                    coordinates.push([coordinates[0][0], coordinates[0][1]]);
+                }
+
+                database.features.push({
+                    type: 'Feature',
+                    properties: { id: id, name: name, color: currentColor, created: new Date().toISOString() },
+                    geometry: { type: 'Polygon', coordinates: [coordinates] }
+                });
+
+                sortFeatures();
                 saveToLocalStorage();
-                updateSyncStatus('synced');
-                return true;
-            }
-            throw new Error('Brak pliku');
-        } catch (e) {
-            const localDb = loadFromLocalStorage();
-            if (localDb?.features?.length > 0) {
-                database = localDb;
-            }
-            updateSyncStatus('local');
-            return false;
-        }
-    }
+                updateSyncStatus('local');
+                renderTerenList();
+                renderDbOnMap();
 
-    // ============================================================
-    // MAPA
-    // ============================================================
-    const map = L.map('map').setView([50.0, 20.0], 10);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+                const nextId = getNextId();
+                document.getElementById('teren-id').value = nextId;
+                document.getElementById('teren-name').value = 'Teren ' + nextId;
+                updateUrl();
 
-    const drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
-
-    const dbLayer = new L.FeatureGroup();
-    map.addLayer(dbLayer);
-
-    let currentColor = '#e74c3c';
-    let currentPolygon = null;
-
-    const drawControl = new L.Control.Draw({
-        draw: {
-            polygon: { shapeOptions: { color: currentColor } },
-            rectangle: { shapeOptions: { color: currentColor } },
-            polyline: false, circle: false, marker: false, circlemarker: false
-        },
-        edit: { featureGroup: drawnItems }
-    });
-    map.addControl(drawControl);
-
-    // ============================================================
-    // ZDARZENIA MAPY
-    // ============================================================
-    map.on(L.Draw.Event.CREATED, function(e) {
-        drawnItems.clearLayers();
-        e.layer.setStyle({ color: currentColor, fillColor: currentColor, fillOpacity: 0.2 });
-        drawnItems.addLayer(e.layer);
-        currentPolygon = e.layer;
-        updateUrl();
-        enableButtons();
-    });
-
-    map.on(L.Draw.Event.EDITED, function() {
-        if (drawnItems.getLayers().length > 0) {
-            currentPolygon = drawnItems.getLayers()[0];
-            updateUrl();
-        }
-    });
-
-    map.on(L.Draw.Event.DELETED, function() {
-        currentPolygon = null;
-        clearOutputs();
-    });
-
-    // ============================================================
-    // ZAKŁADKI
-    // ============================================================
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            this.classList.add('active');
-            document.getElementById('tab-' + this.dataset.tab).classList.add('active');
-        });
-    });
-
-    // ============================================================
-    // KOLOR
-    // ============================================================
-    const colorPicker = document.getElementById('teren-color');
-    const colorHex = document.getElementById('teren-color-hex');
-
-    colorPicker.addEventListener('input', function() {
-        colorHex.value = this.value;
-        currentColor = this.value;
-        if (currentPolygon) currentPolygon.setStyle({ color: currentColor, fillColor: currentColor });
-        updateUrl();
-    });
-
-    colorHex.addEventListener('input', function() {
-        if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
-            colorPicker.value = this.value;
-            currentColor = this.value;
-            if (currentPolygon) currentPolygon.setStyle({ color: currentColor, fillColor: currentColor });
-            updateUrl();
-        }
-    });
-
-    // ============================================================
-    // FUNKCJE POMOCNICZE
-    // ============================================================
-    function clearOutputs() {
-        document.getElementById('url-output').textContent = '—';
-        document.getElementById('url-poly-output').textContent = '—';
-        document.getElementById('qr-output').innerHTML = '';
-        document.getElementById('btn-download-qr').style.display = 'none';
-        disableButtons();
-    }
-
-    function enableButtons() {
-        document.getElementById('btn-add-to-db').disabled = false;
-        document.getElementById('btn-generate-qr').disabled = false;
-        document.getElementById('btn-copy-url').disabled = false;
-        document.getElementById('btn-copy-poly-url').disabled = false;
-    }
-
-    function disableButtons() {
-        document.getElementById('btn-add-to-db').disabled = true;
-        document.getElementById('btn-generate-qr').disabled = true;
-        document.getElementById('btn-copy-url').disabled = true;
-        document.getElementById('btn-copy-poly-url').disabled = true;
-    }
-
-    function updateUrl() {
-        const id = document.getElementById('teren-id').value.trim();
-        const name = document.getElementById('teren-name').value.trim();
-        const base = document.getElementById('base-url').value.replace(/\/$/, '');
-
-        // URL z ID
-        document.getElementById('url-output').textContent = `${base}?id=${encodeURIComponent(id)}`;
-
-        // URL tymczasowy (poly)
-        if (currentPolygon) {
-            const latlngs = currentPolygon.getLatLngs()[0];
-            const polyStr = latlngs.map(ll => `${ll.lat.toFixed(6)},${ll.lng.toFixed(6)}`).join(',');
-            document.getElementById('url-poly-output').textContent = 
-                `${base}?name=${encodeURIComponent(name)}&poly=${polyStr}&color=${encodeURIComponent(currentColor)}`;
-        } else {
-            document.getElementById('url-poly-output').textContent = '—';
-        }
-    }
-
-    function getNextId() {
-        if (database.features.length === 0) return '1';
-        
-        // Znajdź największy numeryczny prefiks ID
-        const numericIds = database.features
-            .map(f => {
-                const match = String(f.properties.id).match(/^(\d+)/);
-                return match ? parseInt(match[1]) : 0;
-            })
-            .filter(n => !isNaN(n));
-        
-        if (numericIds.length === 0) return '1';
-        return String(Math.max(...numericIds) + 1);
-    }
-
-    // Sortowanie ID: numeryczne na początku, potem tekstowe
-    function sortFeatures() {
-        database.features.sort((a, b) => {
-            const aId = String(a.properties.id);
-            const bId = String(b.properties.id);
-            
-            // Wyciągnij część numeryczną
-            const aMatch = aId.match(/^(\d+)(.*)/);
-            const bMatch = bId.match(/^(\d+)(.*)/);
-            
-            if (aMatch && bMatch) {
-                const aNum = parseInt(aMatch[1]);
-                const bNum = parseInt(bMatch[1]);
-                if (aNum !== bNum) return aNum - bNum;
-                // Jeśli numery równe, sortuj po suffixie
-                return aMatch[2].localeCompare(bMatch[2]);
-            }
-            
-            // Numeryczne przed tekstowymi
-            if (aMatch && !bMatch) return -1;
-            if (!aMatch && bMatch) return 1;
-            
-            // Oba tekstowe
-            return aId.localeCompare(bId);
-        });
-    }
-
-    // ============================================================
-    // IMPORT GEOJSON
-    // ============================================================
-    document.getElementById('btn-import-geojson').addEventListener('click', function() {
-        const errorDiv = document.getElementById('import-error');
-        const successDiv = document.getElementById('import-success');
-        errorDiv.style.display = 'none';
-        successDiv.style.display = 'none';
-
-        const input = document.getElementById('geojson-input').value.trim();
-        if (!input) {
-            errorDiv.textContent = '❌ Wklej GeoJSON!';
-            errorDiv.style.display = 'block';
-            return;
-        }
-
-        let geojson;
-        try { geojson = JSON.parse(input); } catch (e) {
-            errorDiv.textContent = '❌ Błąd JSON';
-            errorDiv.style.display = 'block';
-            return;
-        }
-
-        const coords = extractPolygonCoords(geojson);
-        if (!coords || coords.length < 3) {
-            errorDiv.textContent = '❌ Nie znaleziono wielokąta';
-            errorDiv.style.display = 'block';
-            return;
-        }
-
-        const latlngs = coords.map(c => [c[1], c[0]]);
-        drawnItems.clearLayers();
-
-        const polygon = L.polygon(latlngs, { color: currentColor, fillColor: currentColor, fillOpacity: 0.2 });
-        drawnItems.addLayer(polygon);
-        currentPolygon = polygon;
-        map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
-        updateUrl();
-        enableButtons();
-
-        successDiv.textContent = '✅ Zaimportowano ' + latlngs.length + ' punktów';
-        successDiv.style.display = 'block';
-        document.querySelector('.tab[data-tab="draw"]').click();
-    });
-
-    function extractPolygonCoords(geojson) {
-        if (geojson.type === 'FeatureCollection' && geojson.features) {
-            for (let f of geojson.features) {
-                if (f.geometry?.type === 'Polygon') return f.geometry.coordinates[0];
-                if (f.geometry?.type === 'MultiPolygon') return f.geometry.coordinates[0][0];
-            }
-        } else if (geojson.type === 'Feature' && geojson.geometry?.type === 'Polygon') {
-            return geojson.geometry.coordinates[0];
-        } else if (geojson.type === 'Polygon') {
-            return geojson.coordinates[0];
-        }
-        return null;
-    }
-
-    // ============================================================
-    // PRZYCISKI
-    // ============================================================
-    document.getElementById('btn-clear-polygon').addEventListener('click', function() {
-        drawnItems.clearLayers();
-        currentPolygon = null;
-        clearOutputs();
-    });
-
-    document.getElementById('btn-add-to-db').addEventListener('click', function() {
-        if (!currentPolygon) return alert('Narysuj wielokąt!');
-
-        const id = document.getElementById('teren-id').value.trim();
-        if (!id) return alert('Podaj ID terenu!');
-        
-        const name = document.getElementById('teren-name').value.trim() || 'Teren ' + id;
-
-        // Sprawdź duplikat (porównanie jako stringi)
-        const existing = database.features.findIndex(f => String(f.properties.id) === String(id));
-        if (existing !== -1) {
-            if (!confirm(`ID "${id}" istnieje. Nadpisać?`)) return;
-            database.features.splice(existing, 1);
-        }
-
-        const latlngs = currentPolygon.getLatLngs()[0];
-        const coordinates = latlngs.map(ll => [ll.lng, ll.lat]);
-        if (coordinates[0][0] !== coordinates[coordinates.length-1][0] || 
-            coordinates[0][1] !== coordinates[coordinates.length-1][1]) {
-            coordinates.push([coordinates[0][0], coordinates[0][1]]);
-        }
-
-        database.features.push({
-            type: 'Feature',
-            properties: { id: id, name: name, color: currentColor, created: new Date().toISOString() },
-            geometry: { type: 'Polygon', coordinates: [coordinates] }
-        });
-
-        sortFeatures();
-        saveToLocalStorage();
-        updateSyncStatus('local');
-        renderTerenList();
-        renderDbOnMap();
-
-        const nextId = getNextId();
-        document.getElementById('teren-id').value = nextId;
-        document.getElementById('teren-name').value = 'Teren ' + nextId;
-        updateUrl();
-
-        alert(`✅ Dodano "${name}" (ID: ${id})`);
-    });
-
-    document.getElementById('btn-generate-qr').addEventListener('click', function() {
-        const url = document.getElementById('url-output').textContent;
-        if (!url || url === '—') return;
-
-        const qrDiv = document.getElementById('qr-output');
-        qrDiv.innerHTML = '';
-
-        new QRCode(qrDiv, {
-            text: url,
-            width: 256,
-            height: 256,
-            colorDark: '#2c3e50',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.M
-        });
-
-        document.getElementById('btn-download-qr').style.display = 'block';
-    });
-
-    document.getElementById('btn-copy-url').addEventListener('click', function() {
-        const url = document.getElementById('url-output').textContent;
-        if (url && url !== '—') {
-            navigator.clipboard.writeText(url).then(() => {
-                this.textContent = '✅';
-                setTimeout(() => { this.textContent = '📋 URL'; }, 1500);
+                alert(`✅ Dodano "${name}" (ID: ${id})`);
             });
-        }
-    });
 
-    document.getElementById('btn-copy-poly-url').addEventListener('click', function() {
-        const url = document.getElementById('url-poly-output').textContent;
-        if (url && url !== '—') {
-            navigator.clipboard.writeText(url).then(() => {
-                this.textContent = '✅';
-                setTimeout(() => { this.textContent = '📋 Tymczasowy'; }, 1500);
+            document.getElementById('btn-generate-qr').addEventListener('click', function () {
+                const url = document.getElementById('url-output').textContent;
+                if (!url || url === '—') return;
+
+                const qrDiv = document.getElementById('qr-output');
+                qrDiv.innerHTML = '';
+
+                new QRCode(qrDiv, {
+                    text: url,
+                    width: 256,
+                    height: 256,
+                    colorDark: '#2c3e50',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+
+                document.getElementById('btn-download-qr').style.display = 'block';
             });
-        }
-    });
 
-    document.getElementById('btn-download-qr').addEventListener('click', function() {
-        const img = document.querySelector('#qr-output img');
-        if (!img) return;
-        const link = document.createElement('a');
-        const id = document.getElementById('teren-id').value.trim();
-        const name = document.getElementById('teren-name').value.trim();
-        link.download = `QR_${id}_${name.replace(/\s+/g, '_')}.png`;
-        link.href = img.src;
-        link.click();
-    });
+            document.getElementById('btn-copy-url').addEventListener('click', function () {
+                const url = document.getElementById('url-output').textContent;
+                if (url && url !== '—') {
+                    navigator.clipboard.writeText(url).then(() => {
+                        this.textContent = '✅';
+                        setTimeout(() => { this.textContent = '📋 URL'; }, 1500);
+                    });
+                }
+            });
 
-    // ============================================================
-    // LISTA TERENÓW
-    // ============================================================
-    function renderTerenList() {
-        const list = document.getElementById('teren-list');
-        document.getElementById('teren-count').textContent = `Liczba terenów: ${database.features.length}`;
+            document.getElementById('btn-copy-poly-url').addEventListener('click', function () {
+                const url = document.getElementById('url-poly-output').textContent;
+                if (url && url !== '—') {
+                    navigator.clipboard.writeText(url).then(() => {
+                        this.textContent = '✅';
+                        setTimeout(() => { this.textContent = '📋 Tymczasowy'; }, 1500);
+                    });
+                }
+            });
 
-        if (database.features.length === 0) {
-            list.innerHTML = '<em style="color:#999;">Brak terenów</em>';
-            return;
-        }
+            document.getElementById('btn-download-qr').addEventListener('click', function () {
+                const img = document.querySelector('#qr-output img');
+                if (!img) return;
+                const link = document.createElement('a');
+                const id = document.getElementById('teren-id').value.trim();
+                const name = document.getElementById('teren-name').value.trim();
+                link.download = `QR_${id}_${name.replace(/\s+/g, '_')}.png`;
+                link.href = img.src;
+                link.click();
+            });
 
-        list.innerHTML = database.features.map(f => {
-            const p = f.properties;
-            return `
+            // ============================================================
+            // LISTA TERENÓW
+            // ============================================================
+            function renderTerenList() {
+                const list = document.getElementById('teren-list');
+                document.getElementById('teren-count').textContent = `Liczba terenów: ${database.features.length}`;
+
+                if (database.features.length === 0) {
+                    list.innerHTML = '<em style="color:#999;">Brak terenów</em>';
+                    return;
+                }
+
+                list.innerHTML = database.features.map(f => {
+                    const p = f.properties;
+                    return `
                 <div class="teren-item" data-id="${p.id}">
                     <div class="teren-actions">
                         <button class="action-btn qr" data-id="${p.id}">QR</button>
@@ -762,143 +957,147 @@
                     <span style="color:${p.color || '#e74c3c'}">■</span>
                 </div>
             `;
-        }).join('');
+                }).join('');
 
-        list.querySelectorAll('.teren-item').forEach(item => {
-            item.addEventListener('click', function(e) {
-                if (e.target.classList.contains('action-btn')) return;
-                showTerenOnMap(this.dataset.id);
+                list.querySelectorAll('.teren-item').forEach(item => {
+                    item.addEventListener('click', function (e) {
+                        if (e.target.classList.contains('action-btn')) return;
+                        showTerenOnMap(this.dataset.id);
+                    });
+                });
+
+                list.querySelectorAll('.action-btn.delete').forEach(btn => {
+                    btn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        const id = this.dataset.id;
+                        const t = database.features.find(f => String(f.properties.id) === String(id));
+                        if (confirm(`Usunąć "${t.properties.name}"?`)) {
+                            database.features = database.features.filter(f => String(f.properties.id) !== String(id));
+                            saveToLocalStorage();
+                            updateSyncStatus('local');
+                            renderTerenList();
+                            renderDbOnMap();
+                        }
+                    });
+                });
+
+                list.querySelectorAll('.action-btn.qr').forEach(btn => {
+                    btn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        const id = this.dataset.id;
+                        const t = database.features.find(f => String(f.properties.id) === String(id));
+                        document.getElementById('teren-id').value = t.properties.id;
+                        document.getElementById('teren-name').value = t.properties.name;
+                        colorPicker.value = t.properties.color || '#e74c3c';
+                        colorHex.value = t.properties.color || '#e74c3c';
+                        currentColor = t.properties.color || '#e74c3c';
+                        updateUrl();
+                        enableButtons();
+                        document.getElementById('btn-generate-qr').click();
+                    });
+                });
+            }
+
+            function showTerenOnMap(id) {
+                const teren = database.features.find(f => String(f.properties.id) === String(id));
+                if (!teren) return;
+
+                const coords = teren.geometry.coordinates[0];
+                const latlngs = coords.map(c => [c[1], c[0]]);
+                const color = teren.properties.color || '#e74c3c';
+
+                drawnItems.clearLayers();
+                const polygon = L.polygon(latlngs, { color, fillColor: color, fillOpacity: 0.3 });
+                drawnItems.addLayer(polygon);
+                currentPolygon = polygon;
+
+                map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+
+                document.getElementById('teren-id').value = teren.properties.id;
+                document.getElementById('teren-name').value = teren.properties.name;
+                colorPicker.value = color;
+                colorHex.value = color;
+                currentColor = color;
+
+                updateUrl();
+                enableButtons();
+
+                document.querySelectorAll('.teren-item').forEach(el => el.classList.remove('selected'));
+                document.querySelector(`.teren-item[data-id="${id}"]`)?.classList.add('selected');
+            }
+
+            function renderDbOnMap() {
+                dbLayer.clearLayers();
+                console.log('[MAP] Rysuję', database.features.length, 'terenów na mapie');
+
+                database.features.forEach((f, i) => {
+                    const coords = f.geometry.coordinates[0];
+                    const latlngs = coords.map(c => [c[1], c[0]]);
+                    const color = f.properties.color || '#e74c3c';
+
+                    console.log(`[MAP] Teren ${i}: ${f.properties.id} "${f.properties.name}" — ${coords.length} punktów, kolor: ${color}`);
+
+                    L.polygon(latlngs, {
+                        color, fillColor: color, fillOpacity: 0.1, weight: 2, dashArray: '5, 5'
+                    }).addTo(dbLayer).bindPopup(`<b>${f.properties.name}</b><br>ID: ${f.properties.id}`);
+                });
+
+                if (database.features.length > 0 && dbLayer.getBounds().isValid()) {
+                    map.fitBounds(dbLayer.getBounds(), { padding: [50, 50] });
+                }
+            }
+            // ============================================================
+            // EKSPORT / IMPORT
+            // ============================================================
+            document.getElementById('btn-export-db').addEventListener('click', function () {
+                if (database.features.length === 0) return alert('Baza pusta!');
+                const blob = new Blob([JSON.stringify(database, null, 2)], { type: 'application/json' });
+                const link = document.createElement('a');
+                link.download = DB_FILENAME;
+                link.href = URL.createObjectURL(blob);
+                link.click();
             });
-        });
 
-        list.querySelectorAll('.action-btn.delete').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const id = this.dataset.id;
-                const t = database.features.find(f => String(f.properties.id) === String(id));
-                if (confirm(`Usunąć "${t.properties.name}"?`)) {
-                    database.features = database.features.filter(f => String(f.properties.id) !== String(id));
+            document.getElementById('btn-load-server').addEventListener('click', async function () {
+                if (database.features.length > 0 && !confirm('Nadpisać lokalną bazę?')) return;
+                await loadFromServer();
+                renderTerenList();
+                renderDbOnMap();
+            });
+
+            document.getElementById('btn-clear-db').addEventListener('click', function () {
+                if (database.features.length === 0) return;
+                if (confirm('Usunąć WSZYSTKIE tereny?')) {
+                    database = { type: 'FeatureCollection', features: [] };
                     saveToLocalStorage();
                     updateSyncStatus('local');
                     renderTerenList();
                     renderDbOnMap();
                 }
             });
-        });
 
-        list.querySelectorAll('.action-btn.qr').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const id = this.dataset.id;
-                const t = database.features.find(f => String(f.properties.id) === String(id));
-                document.getElementById('teren-id').value = t.properties.id;
-                document.getElementById('teren-name').value = t.properties.name;
-                colorPicker.value = t.properties.color || '#e74c3c';
-                colorHex.value = t.properties.color || '#e74c3c';
-                currentColor = t.properties.color || '#e74c3c';
+            // ============================================================
+            // AKTUALIZACJA URL
+            // ============================================================
+            document.getElementById('teren-id').addEventListener('input', updateUrl);
+            document.getElementById('teren-name').addEventListener('input', updateUrl);
+            document.getElementById('base-url').addEventListener('input', updateUrl);
+
+            // ============================================================
+            // INIT
+            // ============================================================
+            loadFromServer().then(() => {
+                renderTerenList();
+                renderDbOnMap();
+                const nextId = getNextId();
+                document.getElementById('teren-id').value = nextId;
+                document.getElementById('teren-name').value = 'Teren ' + nextId;
                 updateUrl();
-                enableButtons();
-                document.getElementById('btn-generate-qr').click();
             });
-        });
-    }
 
-    function showTerenOnMap(id) {
-        const teren = database.features.find(f => String(f.properties.id) === String(id));
-        if (!teren) return;
-
-        const coords = teren.geometry.coordinates[0];
-        const latlngs = coords.map(c => [c[1], c[0]]);
-        const color = teren.properties.color || '#e74c3c';
-
-        drawnItems.clearLayers();
-        const polygon = L.polygon(latlngs, { color, fillColor: color, fillOpacity: 0.3 });
-        drawnItems.addLayer(polygon);
-        currentPolygon = polygon;
-
-        map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
-
-        document.getElementById('teren-id').value = teren.properties.id;
-        document.getElementById('teren-name').value = teren.properties.name;
-        colorPicker.value = color;
-        colorHex.value = color;
-        currentColor = color;
-
-        updateUrl();
-        enableButtons();
-
-        document.querySelectorAll('.teren-item').forEach(el => el.classList.remove('selected'));
-        document.querySelector(`.teren-item[data-id="${id}"]`)?.classList.add('selected');
-    }
-
-    function renderDbOnMap() {
-        dbLayer.clearLayers();
-        database.features.forEach(f => {
-            const coords = f.geometry.coordinates[0];
-            const latlngs = coords.map(c => [c[1], c[0]]);
-            const color = f.properties.color || '#e74c3c';
-
-            L.polygon(latlngs, {
-                color, fillColor: color, fillOpacity: 0.1, weight: 2, dashArray: '5, 5'
-            }).addTo(dbLayer).bindPopup(`<b>${f.properties.name}</b><br>ID: ${f.properties.id}`);
-        });
-
-        if (database.features.length > 0 && dbLayer.getBounds().isValid()) {
-            map.fitBounds(dbLayer.getBounds(), { padding: [50, 50] });
-        }
-    }
-
-    // ============================================================
-    // EKSPORT / IMPORT
-    // ============================================================
-    document.getElementById('btn-export-db').addEventListener('click', function() {
-        if (database.features.length === 0) return alert('Baza pusta!');
-        const blob = new Blob([JSON.stringify(database, null, 2)], { type: 'application/json' });
-        const link = document.createElement('a');
-        link.download = DB_FILENAME;
-        link.href = URL.createObjectURL(blob);
-        link.click();
-    });
-
-    document.getElementById('btn-load-server').addEventListener('click', async function() {
-        if (database.features.length > 0 && !confirm('Nadpisać lokalną bazę?')) return;
-        await loadFromServer();
-        renderTerenList();
-        renderDbOnMap();
-    });
-
-    document.getElementById('btn-clear-db').addEventListener('click', function() {
-        if (database.features.length === 0) return;
-        if (confirm('Usunąć WSZYSTKIE tereny?')) {
-            database = { type: 'FeatureCollection', features: [] };
-            saveToLocalStorage();
-            updateSyncStatus('local');
-            renderTerenList();
-            renderDbOnMap();
-        }
-    });
-
-    // ============================================================
-    // AKTUALIZACJA URL
-    // ============================================================
-    document.getElementById('teren-id').addEventListener('input', updateUrl);
-    document.getElementById('teren-name').addEventListener('input', updateUrl);
-    document.getElementById('base-url').addEventListener('input', updateUrl);
-
-    // ============================================================
-    // INIT
-    // ============================================================
-    loadFromServer().then(() => {
-        renderTerenList();
-        renderDbOnMap();
-        const nextId = getNextId();
-        document.getElementById('teren-id').value = nextId;
-        document.getElementById('teren-name').value = 'Teren ' + nextId;
-        updateUrl();
-    });
-
-})();
-</script>
+        })();
+    </script>
 
 </body>
+
 </html>

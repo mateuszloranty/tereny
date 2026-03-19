@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Konwerter GeoJSON → tereny.geojson</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px 24px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 24px;
+        }
+
+        .section {
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #34495e;
+            font-size: 14px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .color-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .color-row>div:first-child {
+            width: 80px;
+            flex-shrink: 0;
+        }
+
+        .color-row>div:last-child {
+            flex: 1;
+        }
+
+        input[type="color"] {
+            width: 100%;
+            height: 44px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #34495e;
+        }
+
+        .btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:hover {
+            background: #1e8449;
+        }
+
+        .info-box {
+            background: #eaf4fc;
+            border: 1px solid #b8daff;
+            border-radius: 8px;
+            padding: 14px;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .info-box strong {
+            color: #2c3e50;
+        }
+
+        .result-box {
+            background: #f8f9fa;
+            border: 2px solid #27ae60;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+
+        .result-box h3 {
+            color: #27ae60;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .preview-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .preview-item {
+            padding: 8px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 13px;
+        }
+
+        .preview-item:last-child {
+            border-bottom: none;
+        }
+
+        .preview-item strong {
+            color: #2c3e50;
+            margin-right: 8px;
+        }
+
+        .error-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 14px;
+            color: #856404;
+            font-size: 14px;
+            margin-top: 12px;
+        }
+
+        .error-box strong {
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-row label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>🔄 Konwerter GeoJSON</h1>
+            <p>Przekonwertuj dane z uMap/OpenStreetMap na format tereny.geojson</p>
+        </div>
+
+        <div class="content">
+            <div class="info-box">
+                <strong>📝 Instrukcja:</strong><br>
+                1. Skopiuj GeoJSON z uMap lub innej aplikacji<br>
+                2. Wklej poniżej<br>
+                3. Ustaw domyślny kolor<br>
+                4. Kliknij "Konwertuj"<br>
+                5. Pobierz plik i wgraj na hosting
+            </div>
+
+            <div class="section">
+                <h2>1. Wklej GeoJSON</h2>
+                <textarea id="input-geojson" rows="12" placeholder='Wklej tutaj GeoJSON z uMap, geojson.io lub OSM...
+
+Przykład:
+{
+  "type": "FeatureCollection",
+  "features": [...]
+}'></textarea>
+            </div>
+
+            <div class="section">
+                <h2>2. Ustawienia konwersji</h2>
+
+                <div class="color-row">
+                    <div>
+                        <label>Domyślny kolor:</label>
+                        <input type="color" id="default-color" value="#e74c3c">
+                    </div>
+                    <div>
+                        <label>Kod HEX:</label>
+                        <input type="text" id="default-color-hex" value="#e74c3c">
+                    </div>
+                </div>
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="auto-id-from-name" checked>
+                    <label for="auto-id-from-name">Automatycznie wyciągnij ID z nazwy (np. "157 Gorzków" → ID:
+                        "157")</label>
+                </div>
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="add-timestamp" checked>
+                    <label for="add-timestamp">Dodaj timestamp utworzenia</label>
+                </div>
+            </div>
+
+            <button class="btn" id="btn-convert">
+                🔄 Konwertuj
+            </button>
+
+            <div id="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+
+            // ============================================================
+            // SYNCHRONIZACJA KOLORÓW
+            // ============================================================
+            const colorPicker = document.getElementById('default-color');
+            const colorHex = document.getElementById('default-color-hex');
+
+            colorPicker.addEventListener('input', function () {
+                colorHex.value = this.value;
+            });
+
+            colorHex.addEventListener('input', function () {
+                if (/^#[0-9A-Fa-f]{6}$/i.test(this.value)) {
+                    colorPicker.value = this.value;
+                }
+            });
+
+            // ============================================================
+            // KONWERSJA
+            // ============================================================
+            document.getElementById('btn-convert').addEventListener('click', function () {
+                const input = document.getElementById('input-geojson').value.trim();
+
+                if (!input) {
+                    showError('Wklej GeoJSON do konwersji!');
+                    return;
+                }
+
+                let inputGeoJson;
+                try {
+                    inputGeoJson = JSON.parse(input);
+                } catch (e) {
+                    showError('Nieprawidłowy JSON: ' + e.message);
+                    return;
+                }
+
+                if (inputGeoJson.type !== 'FeatureCollection' || !Array.isArray(inputGeoJson.features)) {
+                    showError('GeoJSON musi być typu FeatureCollection z tablicą features.');
+                    return;
+                }
+
+                const defaultColor = colorPicker.value;
+                const autoIdFromName = document.getElementById('auto-id-from-name').checked;
+                const addTimestamp = document.getElementById('add-timestamp').checked;
+
+                const converted = convertGeoJson(inputGeoJson, defaultColor, autoIdFromName, addTimestamp);
+
+                showResult(converted);
+            });
+
+            // ============================================================
+            // GŁÓWNA FUNKCJA KONWERSJI
+            // ============================================================
+            function convertGeoJson(inputGeoJson, defaultColor, autoIdFromName, addTimestamp) {
+                const output = {
+                    type: 'FeatureCollection',
+                    features: []
+                };
+
+                const usedIds = new Set();
+                let autoIdCounter = 1;
+
+                inputGeoJson.features.forEach((feature, index) => {
+                    // Tylko wielokąty
+                    if (!feature.geometry ||
+                        (feature.geometry.type !== 'Polygon' && feature.geometry.type !== 'MultiPolygon')) {
+                        return;
+                    }
+
+                    const props = feature.properties || {};
+
+                    // --- WYCIĄGNIJ ID Z NAZWY ---
+                    let id = null;
+
+                    if (autoIdFromName && props.name) {
+                        id = String(props.name).split(' ')[0];
+                    }
+
+                    // Fallback: auto numeracja
+                    while (!id || usedIds.has(id)) {
+                        id = String(autoIdCounter++);
+                    }
+                    usedIds.add(id);
+
+                    // --- WYCIĄGNIJ NAZWĘ ---
+                    let name = props.name
+                        || props.description
+                        || props.title
+                        || props.label
+                        || 'Teren ' + id;
+
+                    // --- WYCIĄGNIJ KOLOR ---
+                    let color = props.color
+                        || props.fill
+                        || props['marker-color']
+                        || props.stroke
+                        || defaultColor;
+
+                    // Normalizuj kolor (usuń przezroczystość)
+                    if (color.length === 9 && color.startsWith('#')) {
+                        color = color.substring(0, 7);
+                    }
+
+                    // --- KONWERTUJ WIELOKĄT ---
+                    let coordinates;
+                    if (feature.geometry.type === 'Polygon') {
+                        coordinates = feature.geometry.coordinates;
+                    } else if (feature.geometry.type === 'MultiPolygon') {
+                        coordinates = feature.geometry.coordinates[0];
+                    }
+
+                    // --- ZBUDUJ FEATURE ---
+                    const newFeature = {
+                        type: 'Feature',
+                        properties: {
+                            id: id,
+                            name: name,
+                            color: color
+                        },
+                        geometry: {
+                            type: 'Polygon',
+                            coordinates: coordinates
+                        }
+                    };
+
+                    if (addTimestamp) {
+                        newFeature.properties.created = new Date().toISOString();
+                    }
+
+                    output.features.push(newFeature);
+                });
+
+                return output;
+            }
+            // ============================================================
+            // WYŚWIETLANIE WYNIKU
+            // ============================================================
+            function showResult(converted) {
+                const resultDiv = document.getElementById('result');
+
+                const totalFeatures = converted.features.length;
+                const uniqueIds = new Set(converted.features.map(f => f.properties.id)).size;
+
+                resultDiv.innerHTML = `
+            <div class="result-box">
+                <h3>✅ Konwersja zakończona</h3>
+                
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value">${totalFeatures}</div>
+                        <div class="stat-label">Terenów</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${uniqueIds}</div>
+                        <div class="stat-label">Unikalnych ID</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${JSON.stringify(converted).length}</div>
+                        <div class="stat-label">Znaków (rozmiar)</div>
+                    </div>
+                </div>
+
+                <h4 style="margin: 16px 0 8px; font-size: 14px; color: #2c3e50;">
+                    📋 Podgląd terenów:
+                </h4>
+                <div class="preview-list">
+                    ${converted.features.map(f => `
+                        <div class="preview-item">
+                            <strong>${f.properties.id}</strong>
+                            <span style="color: ${f.properties.color}">■</span>
+                            ${f.properties.name}
+                        </div>
+                    `).join('')}
+                </div>
+
+                <button class="btn btn-success" id="btn-download" style="margin-top: 16px; width: 100%;">
+                    💾 Pobierz tereny.geojson
+                </button>
+            </div>
+        `;
+
+                resultDiv.style.display = 'block';
+
+                // Obsługa pobierania
+                document.getElementById('btn-download').addEventListener('click', function () {
+                    const blob = new Blob(
+                        [JSON.stringify(converted, null, 2)],
+                        { type: 'application/json' }
+                    );
+                    const link = document.createElement('a');
+                    link.download = 'tereny.geojson';
+                    link.href = URL.createObjectURL(blob);
+                    link.click();
+                });
+            }
+
+            // ============================================================
+            // WYŚWIETLANIE BŁĘDU
+            // ============================================================
+            function showError(message) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = `
+            <div class="error-box">
+                <strong>❌ Błąd</strong>
+                ${message}
+            </div>
+        `;
+                resultDiv.style.display = 'block';
+            }
+
+        })();
+    </script>
+
+</body>
+
+</html>
