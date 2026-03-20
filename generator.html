@@ -499,7 +499,8 @@
 
             <div class="btn-row">
                 <button class="btn-secondary" id="btn-load-server">🔄 Z serwera</button>
-                <button class="btn-secondary" id="btn-export-db">💾 Eksportuj</button>
+                <button class="btn-secondary" id="btn-export-db">💾 GeoJSON</button>
+                <button class="btn-secondary" id="btn-export-kml">📍 KML</button>
             </div>
 
             <button class="btn-secondary btn-danger" id="btn-clear-db" style="margin-top: 8px;">
@@ -1128,6 +1129,96 @@
             document.getElementById('teren-id').addEventListener('input', updateUrl);
             document.getElementById('teren-name').addEventListener('input', updateUrl);
             document.getElementById('base-url').addEventListener('input', updateUrl);
+
+            // ============================================================
+            // EKSPORT KML
+            // ============================================================
+            document.getElementById('btn-export-kml').addEventListener('click', function () {
+                if (database.features.length === 0) return alert('Baza pusta!');
+
+                const kml = generateKML(database);
+                const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+                const link = document.createElement('a');
+                link.download = 'tereny.kml';
+                link.href = URL.createObjectURL(blob);
+                link.click();
+            });
+
+            function generateKML(geojson) {
+                let placemarks = '';
+
+                geojson.features.forEach(f => {
+                    const id = getFeatureId(f);
+                    const title = getFeatureTitle(f);
+                    const desc = getFeatureDescription(f);
+                    const stroke = f.properties.stroke || f.properties.fill || '#e74c3c';
+                    const fill = f.properties.fill || f.properties.stroke || '#e74c3c';
+                    const fillOpacity = f.properties['fill-opacity'] || 0.15;
+                    const strokeWidth = f.properties['stroke-width'] || 3;
+
+                    // KML używa formatu: aabbggrr (alpha, blue, green, red)
+                    const strokeKml = hexToKmlColor(stroke, 1);
+                    const fillKml = hexToKmlColor(fill, fillOpacity);
+
+                    // Współrzędne: KML format = lng,lat,altitude
+                    const coords = f.geometry.coordinates[0];
+                    const coordStr = coords
+                        .map(c => `${c[0]},${c[1]},0`)
+                        .join('\n              ');
+
+                    placemarks += `
+    <Placemark>
+      <name>${escapeXml(title)}</name>
+      <description>${escapeXml(desc || 'Teren ID: ' + id)}</description>
+      <Style>
+        <LineStyle>
+          <color>${strokeKml}</color>
+          <width>${strokeWidth}</width>
+        </LineStyle>
+        <PolyStyle>
+          <color>${fillKml}</color>
+        </PolyStyle>
+      </Style>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              ${coordStr}
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>`;
+                });
+
+                return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Tereny</name>
+    <description>Eksport z generatora terenów</description>
+${placemarks}
+  </Document>
+</kml>`;
+            }
+
+            // Konwersja #rrggbb + opacity → KML aabbggrr
+            function hexToKmlColor(hex, opacity) {
+                const r = hex.substring(1, 3);
+                const g = hex.substring(3, 5);
+                const b = hex.substring(5, 7);
+                const a = Math.round(opacity * 255).toString(16).padStart(2, '0');
+                return a + b + g + r;
+            }
+
+            // Escapowanie znaków specjalnych XML
+            function escapeXml(str) {
+                return str
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&apos;');
+            }
 
             // ============================================================
             // INIT
