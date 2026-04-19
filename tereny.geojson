@@ -491,6 +491,93 @@
     },
     {
       "type": "Feature",
+      "id": "97",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.04548,
+              49.99448
+            ],
+            [
+              20.04335,
+              49.99642
+            ],
+            [
+              20.04044,
+              49.99778
+            ],
+            [
+              20.03756,
+              49.99832
+            ],
+            [
+              20.03359,
+              49.99897
+            ],
+            [
+              20.03149,
+              49.99959
+            ],
+            [
+              20.03031,
+              50.00101
+            ],
+            [
+              20.02893,
+              50.00105
+            ],
+            [
+              20.02932,
+              49.99934
+            ],
+            [
+              20.02853,
+              49.99913
+            ],
+            [
+              20.03005,
+              49.9981
+            ],
+            [
+              20.03293,
+              49.99751
+            ],
+            [
+              20.03595,
+              49.99557
+            ],
+            [
+              20.03958,
+              49.99435
+            ],
+            [
+              20.04254,
+              49.9944
+            ],
+            [
+              20.04548,
+              49.99448
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "97",
+        "title": "Za Torem od wiaduktu do końca przy rzece, Krakowska od wiaduktu na obwodnicy do Ochota",
+        "name": "Za Torem od wiaduktu do końca przy rzece, Krakowska od wiaduktu na obwodnicy do Ochota",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-04-19T11:06:41.109Z",
+        "description": "Za Torem od wiaduktu do końca przy rzece, Krakowska od wiaduktu na obwodnicy do Ochota"
+      }
+    },
+    {
+      "type": "Feature",
       "id": "151",
       "geometry": {
         "type": "Polygon",
