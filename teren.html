@@ -57,6 +57,17 @@
             flex: 1 1 auto;
             min-height: 200px;
             height: 0;
+            position: relative;
+        }
+
+        /* Kompas obracania mapy (leaflet-rotate) — prawy górny róg */
+        #map .leaflet-control-rotate a {
+            width: 36px;
+            height: 36px;
+        }
+
+        #map .leaflet-control-rotate .leaflet-control-rotate-arrow {
+            background-size: 22px 22px !important;
         }
 
         .bottom-sheet {
@@ -181,6 +192,7 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
 
     <script>
         (function () {
@@ -306,8 +318,18 @@
 
                 const map = L.map('map', {
                     zoomControl: true,
-                    attributionControl: false
+                    attributionControl: false,
+                    rotate: true,
+                    bearing: 0,
+                    touchRotate: true,
+                    rotateControl: {
+                        position: 'topright',
+                        closeOnZeroBearing: false
+                    }
                 });
+                if (map.zoomControl) {
+                    map.zoomControl.setPosition('topleft');
+                }
 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19,
@@ -331,6 +353,15 @@
                 }).addTo(map).bindPopup('Centrum: ' + name);
 
                 map.fitBounds(polygon.getBounds(), { padding: [40, 40] });
+
+                map.whenReady(function () {
+                    map.invalidateSize();
+                    const compass = map.getContainer().querySelector('.leaflet-control-rotate-toggle');
+                    if (compass) {
+                        compass.title =
+                            'Kompas: przeciągnij aby obrócić mapę · dwa palce na ekranie · Shift + scroll';
+                    }
+                });
 
                 setupDeepLinks(centerLat, centerLng);
                 setupGeolocation(map, latlngs, centerLat, centerLng);
