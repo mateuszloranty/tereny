@@ -716,12 +716,22 @@
                 document.getElementById('btn-copy-poly-url').disabled = true;
             }
 
+            function terrainPageUrl(baseRaw) {
+                const b = baseRaw.replace(/\/$/, '');
+                if (/\.html$/i.test(b)) {
+                    return b.replace(/[^/]+$/i, 'teren.html');
+                }
+                return b + '/teren.html';
+            }
+
             function updateUrl() {
                 const id = document.getElementById('teren-id').value.trim();
                 const name = document.getElementById('teren-name').value.trim();
                 const base = document.getElementById('base-url').value.replace(/\/$/, '');
+                const mapPage = terrainPageUrl(base);
 
-                document.getElementById('url-output').textContent = `${base}?id=${encodeURIComponent(id)}`;
+                document.getElementById('url-output').textContent =
+                    `${mapPage}?id=${encodeURIComponent(id)}`;
 
                 if (currentPolygon) {
                     const latlngs = currentPolygon.getLatLngs()[0];
@@ -729,7 +739,7 @@
                         `${ll.lat.toFixed(COORD_PRECISION)},${ll.lng.toFixed(COORD_PRECISION)}`
                     ).join(',');
                     document.getElementById('url-poly-output').textContent =
-                        `${base}?name=${encodeURIComponent(name)}&poly=${polyStr}&color=${encodeURIComponent(currentColor)}`;
+                        `${mapPage}?name=${encodeURIComponent(name)}&poly=${polyStr}&color=${encodeURIComponent(currentColor)}`;
                 } else {
                     document.getElementById('url-poly-output').textContent = '—';
                 }

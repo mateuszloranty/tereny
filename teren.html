@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, 
+          maximum-scale=1.0, user-scalable=no">
+    <title>Mapa terenu</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            min-height: 100dvh;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 14px 16px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .header .subtitle {
+            font-size: 13px;
+            opacity: 0.8;
+            margin-top: 4px;
+        }
+
+        .header .subtitle:empty {
+            display: none;
+        }
+
+        #map {
+            width: 100%;
+            flex: 1 1 auto;
+            min-height: 200px;
+            height: 0;
+        }
+
+        .bottom-sheet {
+            flex-shrink: 0;
+            width: 100%;
+            padding: 12px 16px;
+            padding-bottom: max(12px, calc(8px + env(safe-area-inset-bottom, 0px)));
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #fff;
+            border-top: 1px solid #e4e4e4;
+        }
+
+        #region-status-bar:empty {
+            display: none;
+        }
+
+        #btn-navigate {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 13px 18px;
+            min-height: 48px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            line-height: 1.2;
+            transition: transform 0.1s, opacity 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        #btn-navigate:active {
+            transform: scale(0.98);
+            opacity: 0.92;
+        }
+
+        .btn-navigate {
+            background: linear-gradient(135deg, #27ae60, #1e8449);
+        }
+
+        .legend {
+            padding: 4px 0 0;
+            margin: 0;
+            text-align: center;
+            font-size: 12px;
+            line-height: 1.35;
+            color: #888;
+        }
+
+        .region-status {
+            text-align: center;
+            padding: 8px 12px;
+            font-weight: 600;
+            font-size: 14px;
+            line-height: 1.35;
+            border-radius: 8px;
+        }
+
+        .status-inside {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-outside {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .message {
+            padding: 40px 20px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .message.error {
+            color: #e74c3c;
+        }
+
+        .message h2 {
+            margin-bottom: 10px;
+        }
+
+        .temp-badge {
+            display: inline-block;
+            background: #f39c12;
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <h1 id="region-name">Ładowanie...</h1>
+        <div class="subtitle" id="subtitle"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="bottom-sheet">
+        <div id="region-status-bar"></div>
+
+        <a id="btn-navigate" class="btn-navigate" href="#" aria-label="Rozpocznij nawigację do centrum terenu">
+            Nawiguj do terenu
+        </a>
+
+        <div class="legend">
+            <span id="legend-color" style="color: #e74c3c;">■</span>
+            Granica terenu<span id="legend-user" hidden>&nbsp;|&nbsp;<span style="color: #2196F3;">●</span> Twoja lokalizacja</span>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const terenId = params.get('id');
+            const polyStr = params.get('poly');
+            const paramName = params.get('name');
+            const paramColor = params.get('color');
+
+            if (terenId) {
+                loadFromDatabase(terenId.trim());
+            } else if (polyStr) {
+                loadFromPolyParam(polyStr, paramName, paramColor);
+            } else {
+                window.location.replace('index.html');
+            }
+
+            function loadFromDatabase(id) {
+                fetch('tereny.geojson?t=' + Date.now())
+                    .then(response => {
+                        if (!response.ok) throw new Error('Nie znaleziono pliku tereny.geojson');
+                        return response.json();
+                    })
+                    .then(geojson => {
+                        const teren = findTerenById(geojson, id);
+                        if (!teren) {
+                            showError(`Nie znaleziono terenu o ID: ${id}`);
+                            return;
+                        }
+
+                        const coords = teren.geometry.coordinates[0];
+                        const latlngs = coords.map(c => [c[1], c[0]]);
+                        const p = teren.properties || {};
+
+                        const name = p.title || p.name || 'Teren ' + id;
+                        const description = p.description || '';
+
+                        const style = {
+                            stroke: p.stroke || p.fill || '#e74c3c',
+                            strokeWidth: p['stroke-width'] || 3,
+                            strokeOpacity: p['stroke-opacity'] || 1,
+                            fill: p.fill || p.stroke || '#e74c3c',
+                            fillOpacity: p['fill-opacity'] || 0.15
+                        };
+
+                        initMap(latlngs, name, description, style, false);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showError('Błąd wczytywania bazy: ' + err.message);
+                    });
+            }
+
+            function findTerenById(geojson, id) {
+                if (!geojson.features) return null;
+                const idStr = String(id).trim();
+
+                return geojson.features.find(f => {
+                    if (f.properties?.id !== undefined && String(f.properties.id) === idStr) return true;
+                    if (f.id !== undefined && String(f.id) === idStr) return true;
+                    return false;
+                });
+            }
+
+            function loadFromPolyParam(polyStr, name, color) {
+                const raw = polyStr.split(',').map(Number);
+                const latlngs = [];
+
+                for (let i = 0; i < raw.length; i += 2) {
+                    if (!isNaN(raw[i]) && !isNaN(raw[i + 1])) {
+                        latlngs.push([raw[i], raw[i + 1]]);
+                    }
+                }
+
+                if (latlngs.length < 3) {
+                    showError('Nieprawidłowe współrzędne wielokąta.');
+                    return;
+                }
+
+                const urlColor = color || '#e74c3c';
+                const style = {
+                    stroke: urlColor,
+                    strokeWidth: 3,
+                    strokeOpacity: 1,
+                    fill: urlColor,
+                    fillOpacity: 0.15
+                };
+
+                initMap(latlngs, name || 'Teren tymczasowy', '', style, true);
+            }
+
+            function showError(msg) {
+                document.getElementById('region-name').textContent = 'Błąd';
+                document.getElementById('map').innerHTML =
+                    `<div class="message error"><h2>❌ Błąd</h2><p>${msg}</p><p style="margin-top:16px"><a href="index.html">← Lista terenów</a></p></div>`;
+                var sheet = document.querySelector('.bottom-sheet');
+                if (sheet) sheet.style.display = 'none';
+            }
+
+            function initMap(latlngs, name, description, style, isTemporary) {
+                const stroke = style.stroke;
+                const strokeWidth = style.strokeWidth;
+                const strokeOpacity = style.strokeOpacity;
+                const fill = style.fill;
+                const fillOpacity = style.fillOpacity;
+
+                const titleEl = document.getElementById('region-name');
+                const subtitleEl = document.getElementById('subtitle');
+
+                titleEl.textContent = name;
+                subtitleEl.textContent = description;
+
+                if (isTemporary) {
+                    titleEl.innerHTML = name + '<span class="temp-badge">tymczasowy</span>';
+                }
+
+                document.title = name + ' — Mapa terenu';
+                document.documentElement.style.setProperty('--poly-color', stroke);
+                document.getElementById('legend-color').style.color = stroke;
+
+                const centerLat = latlngs.reduce((s, c) => s + c[0], 0) / latlngs.length;
+                const centerLng = latlngs.reduce((s, c) => s + c[1], 0) / latlngs.length;
+
+                const map = L.map('map', {
+                    zoomControl: true,
+                    attributionControl: false
+                });
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(map);
+
+                const polygon = L.polygon(latlngs, {
+                    color: stroke,
+                    opacity: strokeOpacity,
+                    fillColor: fill,
+                    fillOpacity: fillOpacity,
+                    weight: strokeWidth,
+                    dashArray: isTemporary ? '10, 5' : null
+                }).addTo(map);
+
+                L.circleMarker([centerLat, centerLng], {
+                    radius: 6,
+                    color: stroke,
+                    fillColor: fill,
+                    fillOpacity: 0.8
+                }).addTo(map).bindPopup('Centrum: ' + name);
+
+                map.fitBounds(polygon.getBounds(), { padding: [40, 40] });
+
+                setupDeepLinks(centerLat, centerLng);
+                setupGeolocation(map, latlngs, centerLat, centerLng);
+            }
+
+            function setupDeepLinks(centerLat, centerLng) {
+                const cLat = centerLat.toFixed(6);
+                const cLng = centerLng.toFixed(6);
+
+                const navBtn = document.getElementById('btn-navigate');
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                navBtn.href = isIOS
+                    ? `https://maps.apple.com/?daddr=${cLat},${cLng}&dirflg=d`
+                    : `https://www.google.com/maps/dir/?api=1&destination=${cLat},${cLng}&travelmode=driving`;
+
+                window.terenCenter = { lat: parseFloat(cLat), lng: parseFloat(cLng) };
+            }
+
+            function setupGeolocation(map, latlngs, centerLat, centerLng) {
+                let userMarker = null;
+                let userCircle = null;
+                const statusBar = document.getElementById('region-status-bar');
+
+                function isPointInPolygon(point, polygon) {
+                    const [px, py] = point;
+                    let inside = false;
+                    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                        const [ix, iy] = polygon[i];
+                        const [jx, jy] = polygon[j];
+                        if (((iy > py) !== (jy > py)) &&
+                            (px < (jx - ix) * (py - iy) / (jy - iy) + ix)) {
+                            inside = !inside;
+                        }
+                    }
+                    return inside;
+                }
+
+                function onLocationFound(pos) {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    const acc = pos.coords.accuracy;
+
+                    const legendUser = document.getElementById('legend-user');
+                    if (legendUser) legendUser.hidden = false;
+
+                    if (userMarker) {
+                        userMarker.setLatLng([lat, lng]);
+                        userCircle.setLatLng([lat, lng]).setRadius(acc);
+                    } else {
+                        userMarker = L.circleMarker([lat, lng], {
+                            radius: 8,
+                            color: '#2196F3',
+                            fillColor: '#2196F3',
+                            fillOpacity: 0.9,
+                            weight: 3
+                        }).addTo(map).bindPopup('Twoja lokalizacja');
+
+                        userCircle = L.circle([lat, lng], {
+                            radius: acc,
+                            color: '#2196F3',
+                            fillColor: '#2196F3',
+                            fillOpacity: 0.08,
+                            weight: 1
+                        }).addTo(map);
+                    }
+
+                    const inside = isPointInPolygon([lat, lng], latlngs);
+                    statusBar.className = 'region-status ' + (inside ? 'status-inside' : 'status-outside');
+                    statusBar.textContent = inside
+                        ? '✅ Jesteś w granicach tego terenu'
+                        : '⚠️ Jesteś poza granicami tego terenu';
+
+                    const cLat = window.terenCenter.lat;
+                    const cLng = window.terenCenter.lng;
+                    const navBtn = document.getElementById('btn-navigate');
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                    navBtn.href = isIOS
+                        ? `https://maps.apple.com/?saddr=${lat},${lng}&daddr=${cLat},${cLng}&dirflg=d`
+                        : `https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination=${cLat},${cLng}&travelmode=driving`;
+                }
+
+                function onLocationError(err) { }
+
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(onLocationFound, onLocationError,
+                        { enableHighAccuracy: true, timeout: 10000 });
+                    navigator.geolocation.watchPosition(onLocationFound, onLocationError,
+                        { enableHighAccuracy: true, maximumAge: 5000 });
+                }
+            }
+
+        })();
+    </script>
+
+</body>
+
+</html>
