@@ -386,6 +386,48 @@
     },
     {
       "type": "Feature",
+      "id": "59",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.04004,
+              49.98696
+            ],
+            [
+              20.04011,
+              49.98627
+            ],
+            [
+              20.04069,
+              49.98629
+            ],
+            [
+              20.04062,
+              49.98698
+            ],
+            [
+              20.04004,
+              49.98696
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "59",
+        "title": "Osiedle Szymanowskiego nr 4",
+        "name": "Osiedle Szymanowskiego nr 4",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T17:44:56.380Z"
+      }
+    },
+    {
+      "type": "Feature",
       "id": "71",
       "geometry": {
         "type": "Polygon",
