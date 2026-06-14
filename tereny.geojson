@@ -203,6 +203,48 @@
     },
     {
       "type": "Feature",
+      "id": "25",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.0323,
+              49.9853
+            ],
+            [
+              20.03476,
+              49.98534
+            ],
+            [
+              20.03487,
+              49.98381
+            ],
+            [
+              20.03138,
+              49.98393
+            ],
+            [
+              20.0323,
+              49.9853
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "25",
+        "title": "Jagiełły nr 3, 5",
+        "name": "Jagiełły nr 3, 5",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T17:32:24.434Z"
+      }
+    },
+    {
+      "type": "Feature",
       "id": "37",
       "geometry": {
         "type": "Polygon",
