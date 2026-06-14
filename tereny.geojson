@@ -243,6 +243,251 @@
     },
     {
       "type": "Feature",
+      "id": "4",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.01949,
+              49.99626
+            ],
+            [
+              20.01901,
+              49.99597
+            ],
+            [
+              20.019,
+              49.99542
+            ],
+            [
+              20.01839,
+              49.99537
+            ],
+            [
+              20.01789,
+              49.99557
+            ],
+            [
+              20.01724,
+              49.99559
+            ],
+            [
+              20.01693,
+              49.99588
+            ],
+            [
+              20.0145,
+              49.99577
+            ],
+            [
+              20.01224,
+              49.99469
+            ],
+            [
+              20.01132,
+              49.99517
+            ],
+            [
+              20.01161,
+              49.99613
+            ],
+            [
+              20.00873,
+              49.99694
+            ],
+            [
+              20.00893,
+              49.99735
+            ],
+            [
+              20.00703,
+              49.99788
+            ],
+            [
+              20.0078,
+              49.99931
+            ],
+            [
+              20.0093,
+              49.99906
+            ],
+            [
+              20.00953,
+              49.99875
+            ],
+            [
+              20.01104,
+              49.99806
+            ],
+            [
+              20.01288,
+              49.99744
+            ],
+            [
+              20.0156,
+              49.99707
+            ],
+            [
+              20.01789,
+              49.99745
+            ],
+            [
+              20.01822,
+              49.99708
+            ],
+            [
+              20.01814,
+              49.99664
+            ],
+            [
+              20.01949,
+              49.99626
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "4",
+        "title": "Wieliczka ul. Modrzewiowa",
+        "name": "Wieliczka ul. Modrzewiowa",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T18:37:40.073Z",
+        "description": "Nie dotyczy osiedla szeregówek"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "5",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.00873,
+              49.99694
+            ],
+            [
+              20.00834,
+              49.99627
+            ],
+            [
+              20.00976,
+              49.99587
+            ],
+            [
+              20.01016,
+              49.99654
+            ],
+            [
+              20.00873,
+              49.99694
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "5",
+        "title": "Modrzewiowa szeregówki nr: 55, 55A, 55B, 59C, 59D, 59E",
+        "name": "Modrzewiowa szeregówki nr: 55, 55A, 55B, 59C, 59D, 59E",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T18:39:01.577Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "6",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.01016,
+              49.99654
+            ],
+            [
+              20.00975,
+              49.99586
+            ],
+            [
+              20.01053,
+              49.99569
+            ],
+            [
+              20.01095,
+              49.99632
+            ],
+            [
+              20.01016,
+              49.99654
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "6",
+        "title": "Modrzewiowa szeregówki nr: 55C, 55D, 55E",
+        "name": "Modrzewiowa szeregówki nr: 55C, 55D, 55E",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T18:39:57.925Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "7",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.01095,
+              49.99632
+            ],
+            [
+              20.01053,
+              49.99568
+            ],
+            [
+              20.01141,
+              49.99548
+            ],
+            [
+              20.01161,
+              49.99613
+            ],
+            [
+              20.01095,
+              49.99632
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "7",
+        "title": "Modrzewiowa szeregówki nr: 55F, 55G, 55H",
+        "name": "Modrzewiowa szeregówki nr: 55F, 55G, 55H",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T18:40:47.954Z"
+      }
+    },
+    {
+      "type": "Feature",
       "id": "11",
       "geometry": {
         "type": "Polygon",
