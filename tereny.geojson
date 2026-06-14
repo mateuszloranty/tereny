@@ -386,6 +386,174 @@
     },
     {
       "type": "Feature",
+      "id": "55",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.04287,
+              49.98706
+            ],
+            [
+              20.04232,
+              49.98704
+            ],
+            [
+              20.04236,
+              49.98639
+            ],
+            [
+              20.04289,
+              49.98641
+            ],
+            [
+              20.04287,
+              49.98706
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "55",
+        "title": "Osiedle Szymanowskiego nr 8",
+        "name": "Osiedle Szymanowskiego nr 8",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T17:51:25.463Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "56",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.04175,
+              49.98702
+            ],
+            [
+              20.0418,
+              49.98635
+            ],
+            [
+              20.04236,
+              49.98638
+            ],
+            [
+              20.04232,
+              49.98704
+            ],
+            [
+              20.04175,
+              49.98702
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "56",
+        "title": "Osiedle Szymanowskiego nr 7",
+        "name": "Osiedle Szymanowskiego nr 7",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T17:50:18.845Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "57",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.04119,
+              49.987
+            ],
+            [
+              20.04124,
+              49.98632
+            ],
+            [
+              20.0418,
+              49.98635
+            ],
+            [
+              20.04175,
+              49.98702
+            ],
+            [
+              20.04119,
+              49.987
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "57",
+        "title": "Osiedle Szymanowskiego nr 6",
+        "name": "Osiedle Szymanowskiego nr 6",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T17:49:33.674Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "58",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.04062,
+              49.98698
+            ],
+            [
+              20.04069,
+              49.98629
+            ],
+            [
+              20.04124,
+              49.98632
+            ],
+            [
+              20.04119,
+              49.987
+            ],
+            [
+              20.04062,
+              49.98698
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "58",
+        "title": "Osiedle Szymanowskiego nr 5",
+        "name": "Osiedle Szymanowskiego nr 5",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T17:48:39.654Z"
+      }
+    },
+    {
+      "type": "Feature",
       "id": "59",
       "geometry": {
         "type": "Polygon",
@@ -424,6 +592,52 @@
         "fill": "#e74c3c",
         "fill-opacity": 0.15,
         "created": "2026-06-14T17:44:56.380Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "60",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.03966,
+              49.98718
+            ],
+            [
+              20.03958,
+              49.98625
+            ],
+            [
+              20.0401,
+              49.98627
+            ],
+            [
+              20.04003,
+              49.98697
+            ],
+            [
+              20.04004,
+              49.9872
+            ],
+            [
+              20.03966,
+              49.98718
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "60",
+        "title": "Osiedle Szymanowskiego nr 17",
+        "name": "Osiedle Szymanowskiego nr 17",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T17:47:14.453Z"
       }
     },
     {
