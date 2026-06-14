@@ -336,6 +336,56 @@
     },
     {
       "type": "Feature",
+      "id": "52",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.04287,
+              49.98757
+            ],
+            [
+              20.04286,
+              49.98706
+            ],
+            [
+              20.04004,
+              49.98696
+            ],
+            [
+              20.04004,
+              49.98732
+            ],
+            [
+              20.04195,
+              49.98739
+            ],
+            [
+              20.04227,
+              49.98776
+            ],
+            [
+              20.04287,
+              49.98757
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "52",
+        "title": "Osiedle Szymanowskiego nr 2",
+        "name": "Osiedle Szymanowskiego nr 2",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T17:41:30.299Z"
+      }
+    },
+    {
+      "type": "Feature",
       "id": "71",
       "geometry": {
         "type": "Polygon",
