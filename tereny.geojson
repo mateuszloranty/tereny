@@ -570,6 +570,48 @@
     },
     {
       "type": "Feature",
+      "id": "10",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.02656,
+              49.99789
+            ],
+            [
+              20.02469,
+              49.99774
+            ],
+            [
+              20.02475,
+              49.99744
+            ],
+            [
+              20.02661,
+              49.99758
+            ],
+            [
+              20.02656,
+              49.99789
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "10",
+        "title": "Różana szeregówki nr: 54A, 54B, 54C",
+        "name": "Różana szeregówki nr: 54A, 54B, 54C",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T18:57:43.913Z"
+      }
+    },
+    {
+      "type": "Feature",
       "id": "11",
       "geometry": {
         "type": "Polygon",
