@@ -1103,6 +1103,57 @@
     },
     {
       "type": "Feature",
+      "id": "16",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.02418,
+              49.99422
+            ],
+            [
+              20.02224,
+              49.99443
+            ],
+            [
+              20.02205,
+              49.99356
+            ],
+            [
+              20.02256,
+              49.99291
+            ],
+            [
+              20.02278,
+              49.99241
+            ],
+            [
+              20.024,
+              49.99276
+            ],
+            [
+              20.02418,
+              49.99422
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "16",
+        "title": "Krzyszkowicka, Ochota",
+        "name": "Krzyszkowicka, Ochota",
+        "stroke": "#e74c3c",
+        "stroke-opacity": 1,
+        "stroke-width": 3,
+        "fill": "#e74c3c",
+        "fill-opacity": 0.15,
+        "created": "2026-06-14T19:36:09.245Z",
+        "description": "Krzyszkowicka szeregówki nr: 80B-80H, Ochota szeregówki nr: 2-2L"
+      }
+    },
+    {
+      "type": "Feature",
       "id": "21",
       "geometry": {
         "type": "Polygon",
