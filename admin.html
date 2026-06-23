@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="utf-8">
+    <meta name="robots" content="noindex, nofollow">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Admin — Tereny</title>
 
@@ -105,6 +106,7 @@
             padding: 0 16px 24px;
             min-height: 0;
             touch-action: pan-y;
+            position: relative;
         }
 
         /* ── Sync status ── */
@@ -133,6 +135,67 @@
         .sync-status.error {
             background: #f8d7da;
             color: #721c24;
+        }
+
+        .sync-status.saving {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        /* ── Saving lock on panel ── */
+        .sheet-saving {
+            display: none;
+            position: absolute;
+            inset: 0;
+            z-index: 60;
+            background: rgba(255, 255, 255, 0.82);
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 14px;
+            pointer-events: all;
+        }
+
+        .panel-sheet.is-saving .sheet-saving {
+            display: flex;
+        }
+
+        .panel-sheet.is-saving .sheet-body {
+            overflow: hidden;
+        }
+
+        .panel-sheet.is-saving .sheet-handle {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        .sheet-saving p {
+            font-size: 14px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .sheet-saving .loading-spinner {
+            width: 36px;
+            height: 36px;
+            margin: 0;
+        }
+
+        .btn-secondary:disabled,
+        .btn-back:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .btn-success:disabled {
+            background: #95a5a6;
+        }
+
+        .action-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            pointer-events: none;
         }
 
         /* ── Views ── */
@@ -235,6 +298,25 @@
 
         .btn-draw:active {
             background: #2980b9;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .btn-row .btn-primary,
+        .btn-row .btn-secondary {
+            flex: 1;
+            margin-top: 0;
+        }
+
+        .temp-url-hint {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.45;
+            margin-top: 8px;
         }
 
         /* ── Form ── */
@@ -535,6 +617,10 @@
             </div>
 
             <div class="sheet-body" id="sheet-body">
+                <div class="sheet-saving" id="sheet-saving" aria-live="polite" aria-busy="true">
+                    <div class="loading-spinner" aria-hidden="true"></div>
+                    <p>Zapisuję na Google Drive…</p>
+                </div>
                 <div id="sync-status" class="sync-status loading">⏳ Ładowanie z Google Drive…</div>
 
                 <!-- LISTA -->
@@ -584,9 +670,15 @@
                         ✏️ Rysuj granice
                     </button>
 
-                    <button class="btn-primary btn-success" id="btn-save" type="button" style="margin-top: 12px;">
-                        💾 Zapisz
-                    </button>
+                    <div class="btn-row">
+                        <button class="btn-primary btn-success" id="btn-save" type="button">
+                            💾 Zapisz
+                        </button>
+                        <button class="btn-secondary btn-copy-temp-url" id="btn-copy-temp-url" type="button" disabled>
+                            🔗 Link tymczasowy
+                        </button>
+                    </div>
+                    <p class="temp-url-hint">Link tymczasowy nie zapisuje terenu w bazie — do testów i szybkiego udostępniania.</p>
                 </div>
 
                 <!-- RYSOWANIE -->
@@ -608,10 +700,16 @@
 
                     <button class="btn-secondary" id="btn-clear-polygon" type="button">🗑️ Wyczyść wielokąt</button>
 
-                    <button class="btn-primary btn-success" id="btn-save-from-draw" type="button"
-                        style="margin-top: 12px;">
-                        💾 Zapisz teren
-                    </button>
+                    <div class="btn-row">
+                        <button class="btn-primary btn-success" id="btn-save-from-draw" type="button">
+                            ✓ Zapisz wielokąt
+                        </button>
+                        <button class="btn-secondary btn-copy-temp-url" id="btn-copy-temp-url-draw" type="button" disabled>
+                            🔗 Link tymczasowy
+                        </button>
+                    </div>
+                    <p class="temp-url-hint" id="draw-save-hint">Zapisuje granice i wraca do edycji danych terenu.</p>
+                    <p class="temp-url-hint">Link tymczasowy nie zapisuje terenu w bazie — do testów i szybkiego udostępniania.</p>
                 </div>
             </div>
         </aside>
@@ -654,6 +752,7 @@
             let currentPolygon = null;
             let currentColor = '#e74c3c';
             let isDirty = false;
+            let isSaving = false;
 
             // Mapa — wybór i wygaszanie
             let selectedTerrainId = null;
@@ -722,6 +821,23 @@
                 }
             }
 
+            function setSaving(saving) {
+                isSaving = saving;
+                panelSheet.classList.toggle('is-saving', saving);
+                panelSheet.setAttribute('aria-busy', saving ? 'true' : 'false');
+
+                panelSheet.querySelectorAll(
+                    'button, input, textarea, select, .teren-item'
+                ).forEach(function (el) {
+                    if (el.classList.contains('teren-item')) {
+                        el.style.pointerEvents = saving ? 'none' : '';
+                        el.setAttribute('aria-disabled', saving ? 'true' : 'false');
+                        return;
+                    }
+                    el.disabled = saving;
+                });
+            }
+
             async function loadFromServer() {
                 const fromDrive = !!CONFIG.DRIVE_SYNC_URL;
                 if (fromDrive) {
@@ -781,6 +897,8 @@
             }
 
             async function saveToServer() {
+                if (isSaving) return false;
+
                 saveToLocalStorage();
                 sortFeatures();
 
@@ -790,6 +908,7 @@
                     return false;
                 }
 
+                setSaving(true);
                 updateSyncStatus('saving');
                 try {
                     const res = await fetch(CONFIG.DRIVE_SYNC_URL, {
@@ -799,12 +918,41 @@
                     });
                     if (!res.ok) throw new Error('Status ' + res.status);
                     isDirty = false;
+                    if (CONFIG.DRIVE_SYNC_URL) {
+                        await reloadFromDrive({ silent: true });
+                    }
                     updateSyncStatus('synced');
                     return true;
                 } catch (e) {
                     console.error('Save failed:', e);
                     isDirty = true;
                     updateSyncStatus('error', '❌ Nie udało się zapisać: ' + e.message);
+                    return false;
+                } finally {
+                    setSaving(false);
+                }
+            }
+
+            async function reloadFromDrive(options) {
+                options = options || {};
+                if (!CONFIG.DRIVE_SYNC_URL) return false;
+
+                if (!options.silent) {
+                    updateSyncStatus('loading', '⏳ Odświeżanie z Google Drive…');
+                }
+
+                try {
+                    const res = await fetch(CONFIG.DRIVE_SYNC_URL + '?t=' + Date.now());
+                    if (!res.ok) throw new Error('Status ' + res.status);
+                    database = await res.json();
+                    saveToLocalStorage();
+                    updateSyncStatus('synced');
+                    return true;
+                } catch (e) {
+                    console.warn('Reload from Drive failed:', e);
+                    if (!options.silent) {
+                        updateSyncStatus('error', '❌ Nie udało się odświeżyć z Drive');
+                    }
                     return false;
                 }
             }
@@ -868,6 +1016,71 @@
                 return terrainPageUrl() + '?id=' + encodeURIComponent(id);
             }
 
+            function buildTemporaryTerenUrl() {
+                if (!currentPolygon) return null;
+
+                const name = document.getElementById('teren-name').value.trim() || 'Teren tymczasowy';
+                const latlngs = currentPolygon.getLatLngs()[0];
+                const polyStr = latlngs.map(function (ll) {
+                    return ll.lat.toFixed(CONFIG.COORD_PRECISION) + ',' + ll.lng.toFixed(CONFIG.COORD_PRECISION);
+                }).join(',');
+
+                return terrainPageUrl() +
+                    '?name=' + encodeURIComponent(name) +
+                    '&poly=' + encodeURIComponent(polyStr) +
+                    '&color=' + encodeURIComponent(currentColor);
+            }
+
+            function hasTerrainPolygon() {
+                if (currentPolygon) return true;
+                const id = document.getElementById('teren-id')?.value.trim();
+                if (!id) return false;
+                const f = database.features.find(function (t) {
+                    return String(getFeatureId(t)) === String(id);
+                });
+                const ring = f?.geometry?.coordinates?.[0];
+                return Array.isArray(ring) && ring.length >= 3;
+            }
+
+            function updateTempUrlButtonState() {
+                const enabled = !!currentPolygon;
+                document.querySelectorAll('.btn-copy-temp-url').forEach(function (btn) {
+                    btn.disabled = !enabled;
+                });
+
+                const drawBtn = document.getElementById('btn-go-draw');
+                if (drawBtn) {
+                    drawBtn.textContent = hasTerrainPolygon()
+                        ? '✏️ Edytuj granice'
+                        : '✏️ Rysuj granice';
+                }
+            }
+
+            async function copyTemporaryTerenUrl(triggerBtn) {
+                if (isSaving) return;
+
+                const url = buildTemporaryTerenUrl();
+                if (!url) {
+                    alert('Narysuj granice terenu przed wygenerowaniem linku.');
+                    return;
+                }
+
+                const btn = triggerBtn || document.querySelector('.btn-copy-temp-url:not(:disabled)');
+                const originalLabel = btn ? btn.textContent : '';
+
+                try {
+                    await navigator.clipboard.writeText(url);
+                    if (btn) {
+                        btn.textContent = '✅ Skopiowano!';
+                        setTimeout(function () {
+                            btn.textContent = originalLabel;
+                        }, 2000);
+                    }
+                } catch (e) {
+                    window.prompt('Skopiuj link tymczasowy:', url);
+                }
+            }
+
             // ============================================================
             // MAPA
             // ============================================================
@@ -900,16 +1113,19 @@
                 e.layer.setStyle({ color: currentColor, fillColor: currentColor, fillOpacity: 0.25 });
                 drawnItems.addLayer(e.layer);
                 currentPolygon = e.layer;
+                updateTempUrlButtonState();
             });
 
             map.on(L.Draw.Event.EDITED, function () {
                 if (drawnItems.getLayers().length) {
                     currentPolygon = drawnItems.getLayers()[0];
                 }
+                updateTempUrlButtonState();
             });
 
             map.on(L.Draw.Event.DELETED, function () {
                 currentPolygon = null;
+                updateTempUrlButtonState();
             });
 
             function setDrawControlVisible(visible) {
@@ -1030,6 +1246,7 @@
                 drawnItems.addLayer(polygon);
                 currentPolygon = polygon;
                 map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+                updateTempUrlButtonState();
             }
 
             function renderDbOnMap(fitAll) {
@@ -1097,6 +1314,10 @@
                     renderDbOnMap();
                 }
 
+                if (view === 'editor') {
+                    updateTempUrlButtonState();
+                }
+
                 if (view !== 'draw') {
                     expandSheet();
                 }
@@ -1136,9 +1357,28 @@
                     applyTerrainFading();
                 }
 
+                updateTempUrlButtonState();
                 document.getElementById('teren-id').readOnly = !!id;
                 setPanelView('editor');
                 expandSheet();
+            }
+
+            function updateDrawPanelActions() {
+                const isNew = editingId === null;
+                const btn = document.getElementById('btn-save-from-draw');
+                const hint = document.getElementById('draw-save-hint');
+
+                if (isNew) {
+                    btn.textContent = '✓ Zapisz wielokąt';
+                    if (hint) {
+                        hint.textContent = 'Zapisuje granice i wraca do edycji danych terenu (bez zapisu do bazy).';
+                    }
+                } else {
+                    btn.textContent = '💾 Zapisz teren';
+                    if (hint) {
+                        hint.textContent = 'Zapisuje zmiany granic na Google Drive.';
+                    }
+                }
             }
 
             function openDrawMode() {
@@ -1153,6 +1393,7 @@
                     if (existing) loadPolygonToDraw(existing);
                 }
 
+                updateDrawPanelActions();
                 setPanelView('draw');
                 collapseSheet();
             }
@@ -1212,7 +1453,7 @@
                 });
 
                 list.querySelectorAll('.action-btn.delete').forEach(btn => {
-                    btn.addEventListener('click', function (e) {
+                    btn.addEventListener('click', async function (e) {
                         e.stopPropagation();
                         const id = this.dataset.id;
                         const f = database.features.find(t => String(getFeatureId(t)) === String(id));
@@ -1224,10 +1465,9 @@
                         database.features = database.features.filter(
                             t => String(getFeatureId(t)) !== String(id)
                         );
-                        saveToServer().then(() => {
-                            renderTerenList();
-                            renderDbOnMap();
-                        });
+                        const saved = await saveToServer();
+                        renderTerenList();
+                        renderDbOnMap();
                     });
                 });
 
@@ -1296,7 +1536,26 @@
                 return feature;
             }
 
+            async function saveFromDrawView() {
+                if (isSaving) return;
+
+                if (!currentPolygon) {
+                    alert('Narysuj wielokąt!');
+                    return;
+                }
+
+                if (editingId === null) {
+                    setPanelView('editor');
+                    expandSheet();
+                    return;
+                }
+
+                await saveCurrentTeren();
+            }
+
             async function saveCurrentTeren() {
+                if (isSaving) return;
+
                 const feature = buildFeatureFromForm();
                 if (!feature) return;
 
@@ -1318,9 +1577,9 @@
                 const saved = await saveToServer();
 
                 selectedTerrainId = String(id);
+                editingId = id;
                 renderTerenList();
                 renderDbOnMap(false);
-                editingId = id;
                 setPanelView('list');
 
                 if (saved) {
@@ -1456,11 +1715,18 @@
             document.getElementById('btn-back-editor').addEventListener('click', () => setPanelView('editor'));
             document.getElementById('btn-go-draw').addEventListener('click', openDrawMode);
             document.getElementById('btn-save').addEventListener('click', saveCurrentTeren);
-            document.getElementById('btn-save-from-draw').addEventListener('click', saveCurrentTeren);
+            document.getElementById('btn-save-from-draw').addEventListener('click', saveFromDrawView);
+
+            document.querySelectorAll('.btn-copy-temp-url').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    copyTemporaryTerenUrl(btn);
+                });
+            });
 
             document.getElementById('btn-clear-polygon').addEventListener('click', function () {
                 drawnItems.clearLayers();
                 currentPolygon = null;
+                updateTempUrlButtonState();
             });
 
             document.getElementById('btn-close-qr').addEventListener('click', function () {
