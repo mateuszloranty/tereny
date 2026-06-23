@@ -319,6 +319,10 @@
             margin-top: 8px;
         }
 
+        .temp-link-hidden {
+            display: none !important;
+        }
+
         /* ── Form ── */
         label {
             display: block;
@@ -550,7 +554,9 @@
         }
 
         @keyframes loading-spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .loading-box p {
@@ -678,7 +684,8 @@
                             🔗 Link tymczasowy
                         </button>
                     </div>
-                    <p class="temp-url-hint">Link tymczasowy nie zapisuje terenu w bazie — do testów i szybkiego udostępniania.</p>
+                    <p class="temp-url-hint temp-link-hint">Link tymczasowy nie zapisuje terenu w bazie — do testów i
+                        szybkiego udostępniania.</p>
                 </div>
 
                 <!-- RYSOWANIE -->
@@ -704,12 +711,14 @@
                         <button class="btn-primary btn-success" id="btn-save-from-draw" type="button">
                             ✓ Zapisz wielokąt
                         </button>
-                        <button class="btn-secondary btn-copy-temp-url" id="btn-copy-temp-url-draw" type="button" disabled>
+                        <button class="btn-secondary btn-copy-temp-url" id="btn-copy-temp-url-draw" type="button"
+                            disabled>
                             🔗 Link tymczasowy
                         </button>
                     </div>
                     <p class="temp-url-hint" id="draw-save-hint">Zapisuje granice i wraca do edycji danych terenu.</p>
-                    <p class="temp-url-hint">Link tymczasowy nie zapisuje terenu w bazie — do testów i szybkiego udostępniania.</p>
+                    <p class="temp-url-hint temp-link-hint">Link tymczasowy nie zapisuje terenu w bazie — do testów i
+                        szybkiego udostępniania.</p>
                 </div>
             </div>
         </aside>
@@ -749,6 +758,7 @@
             let database = { type: 'FeatureCollection', features: [] };
             let panelView = 'list';
             let editingId = null; // null = nowy teren
+            let isCreatingNewTeren = false;
             let currentPolygon = null;
             let currentColor = '#e74c3c';
             let isDirty = false;
@@ -1043,9 +1053,15 @@
             }
 
             function updateTempUrlButtonState() {
+                const showTempLink = isCreatingNewTeren;
                 const enabled = !!currentPolygon;
+
                 document.querySelectorAll('.btn-copy-temp-url').forEach(function (btn) {
                     btn.disabled = !enabled;
+                    btn.classList.toggle('temp-link-hidden', !showTempLink);
+                });
+                document.querySelectorAll('.temp-link-hint').forEach(function (el) {
+                    el.classList.toggle('temp-link-hidden', !showTempLink);
                 });
 
                 const drawBtn = document.getElementById('btn-go-draw');
@@ -1314,7 +1330,7 @@
                     renderDbOnMap();
                 }
 
-                if (view === 'editor') {
+                if (view === 'editor' || view === 'draw') {
                     updateTempUrlButtonState();
                 }
 
@@ -1326,7 +1342,8 @@
             }
 
             function openEditor(id) {
-                editingId = id;
+                isCreatingNewTeren = !id;
+                editingId = id || null;
 
                 if (id) {
                     const f = database.features.find(t => String(getFeatureId(t)) === String(id));
@@ -1364,7 +1381,7 @@
             }
 
             function updateDrawPanelActions() {
-                const isNew = editingId === null;
+                const isNew = isCreatingNewTeren;
                 const btn = document.getElementById('btn-save-from-draw');
                 const hint = document.getElementById('draw-save-hint');
 
@@ -1394,6 +1411,7 @@
                 }
 
                 updateDrawPanelActions();
+                updateTempUrlButtonState();
                 setPanelView('draw');
                 collapseSheet();
             }
@@ -1544,7 +1562,7 @@
                     return;
                 }
 
-                if (editingId === null) {
+                if (isCreatingNewTeren) {
                     setPanelView('editor');
                     expandSheet();
                     return;
@@ -1578,6 +1596,7 @@
 
                 selectedTerrainId = String(id);
                 editingId = id;
+                isCreatingNewTeren = false;
                 renderTerenList();
                 renderDbOnMap(false);
                 setPanelView('list');
