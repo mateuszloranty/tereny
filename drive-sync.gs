@@ -3,6 +3,7 @@
  *
  * 1. Utwórz plik tereny.geojson na Google Drive.
  * 2. Utwórz arkusz z zakładkami: Bracia, Tereny, Grupa 1, Grupa 2, Opracowanie 1-20, …
+ *    (zakładki „Grupa X” uzupełniaj ręcznie — skrypt ich nie nadpisuje)
  * 3. Wklej FILE_ID i SPREADSHEET_ID poniżej.
  * 4. Wdróż jako aplikacja internetowa (wykonuj jako: Ja, dostęp: Każdy).
  * 5. Skopiuj URL wdrożenia do CONFIG.DRIVE_SYNC_URL w admin.html i servant.html
@@ -397,25 +398,6 @@ function writeBracia_(rows) {
   }
   sh.clear();
   sh.getRange(1, 1, values.length, headers.length).setValues(values);
-  syncGroupMembersFromBracia_(rows);
-}
-
-function syncGroupMembersFromBracia_(rows) {
-  var grupy = detectGrupy_();
-  for (var g = 0; g < grupy.length; g++) {
-    var sheetName = grupy[g].name;
-    var members = [];
-    for (var i = 0; i < rows.length; i++) {
-      if (bratBelongsToGrupa_(rows[i].grupa_id, sheetName)) {
-        members.push({
-          id_brata: rows[i].id,
-          imie: rows[i].imie || '',
-          nazwisko: rows[i].nazwisko || ''
-        });
-      }
-    }
-    writeGrupaMembersOnly_(sheetName, members);
-  }
 }
 
 // ── Grupy (zakładki w jednym arkuszu Google Sheets) ─────────────────────────
@@ -433,11 +415,6 @@ function resolveGrupaSheetName_(idOrName) {
   if (byPrefix) return byPrefix.getName();
 
   return prefixed;
-}
-
-function bratBelongsToGrupa_(bratGrupaId, grupaSheetName) {
-  if (!bratGrupaId) return false;
-  return resolveGrupaSheetName_(bratGrupaId) === resolveGrupaSheetName_(grupaSheetName);
 }
 
 function detectGrupy_() {
@@ -517,70 +494,12 @@ function readGrupa_(idOrName) {
   return { id: sheetName, name: sheetName, members: members, assignments: assignments };
 }
 
-/** Aktualizuje tylko listę członków — bez czyszczenia formatowania szablonu. */
-function writeGrupaMembersOnly_(sheetName, members) {
-  members = members || [];
-  var sh = findSheet_(sheetName);
-  if (!sh) return;
-
-  var data = sh.getDataRange().getValues();
-  var memberStartRow = 2;
-  var sectionEndRow = data.length;
-
-  for (var r = 0; r < data.length; r++) {
-    var c0 = normalizeHeader_(data[r][0]);
-    if (c0 === 'id_brata') memberStartRow = r + 2;
-    if (c0 === 'przydziały' || c0 === 'przydzialy' || c0 === 'tereny') {
-      sectionEndRow = r;
-      break;
-    }
-  }
-
-  var numRows = Math.max(0, sectionEndRow - memberStartRow);
-  if (numRows > 0) {
-    sh.getRange(memberStartRow, 1, numRows, 3).clearContent();
-  }
-
-  if (!members.length) return;
-
-  if (members.length > numRows) {
-    sh.insertRowsAfter(sectionEndRow > memberStartRow ? sectionEndRow - 1 : memberStartRow, members.length - numRows);
-  }
-
-  var values = [];
-  for (var m = 0; m < members.length; m++) {
-    values.push([members[m].id_brata, members[m].imie || '', members[m].nazwisko || '']);
-  }
-  sh.getRange(memberStartRow, 1, values.length, 3).setValues(values);
-}
-
+/**
+ * Zakładki „Grupa X” mają niestandardowy układ — uzupełniaj je ręcznie w arkuszu.
+ * Zapis z API jest celowo pomijany (tylko odczyt przez readGrupa_).
+ */
 function writeGrupa_(idOrName, members, assignments) {
-  members = members || [];
-  assignments = assignments || [];
-  var name = resolveGrupaSheetName_(idOrName);
-  var sh = findSheet_(name);
-  if (sh) {
-    writeGrupaMembersOnly_(name, members);
-    return;
-  }
-  sh = ensureSheet_(name, []);
-  var values = [
-    ['id_brata', 'imie', 'nazwisko'],
-    ['', '', '']
-  ];
-  for (var m = 0; m < members.length; m++) {
-    var mem = members[m];
-    values.push([mem.id_brata, mem.imie || '', mem.nazwisko || '']);
-  }
-  values.push(['', '', '']);
-  values.push(['Przydziały', '', '']);
-  values.push(['teren_nr', 'data_przydzialu', 'data_opracowania']);
-  for (var a = 0; a < assignments.length; a++) {
-    var asg = assignments[a];
-    values.push([asg.teren_nr, asg.data_przydzialu || '', asg.data_opracowania || '']);
-  }
-  sh.clear();
-  sh.getRange(1, 1, values.length, 3).setValues(values);
+  // no-op
 }
 
 // ── Tereny meta ─────────────────────────────────────────────────────────────
