@@ -316,16 +316,18 @@
                 const centerLat = latlngs.reduce((s, c) => s + c[0], 0) / latlngs.length;
                 const centerLng = latlngs.reduce((s, c) => s + c[1], 0) / latlngs.length;
 
+                const allowRotate = !window.matchMedia('(pointer: coarse)').matches;
+
                 const map = L.map('map', {
                     zoomControl: true,
                     attributionControl: false,
-                    rotate: true,
+                    rotate: allowRotate,
                     bearing: 0,
-                    touchRotate: true,
-                    rotateControl: {
+                    touchRotate: allowRotate,
+                    rotateControl: allowRotate ? {
                         position: 'topright',
                         closeOnZeroBearing: false
-                    }
+                    } : false
                 });
                 if (map.zoomControl) {
                     map.zoomControl.setPosition('topleft');
@@ -356,6 +358,7 @@
 
                 map.whenReady(function () {
                     map.invalidateSize();
+                    if (!allowRotate) return;
                     const compass = map.getContainer().querySelector('.leaflet-control-rotate-toggle');
                     if (compass) {
                         compass.title =
@@ -367,15 +370,23 @@
                 setupGeolocation(map, latlngs, centerLat, centerLng);
             }
 
+            function googleMapsNavUrl(destLat, destLng, originLat, originLng) {
+                const dest = destLat + ',' + destLng;
+                if (originLat != null && originLng != null) {
+                    return 'https://www.google.com/maps/dir/?api=1&origin=' +
+                        originLat + ',' + originLng +
+                        '&destination=' + dest + '&travelmode=driving';
+                }
+                return 'https://www.google.com/maps/dir/?api=1&destination=' +
+                    dest + '&travelmode=driving';
+            }
+
             function setupDeepLinks(centerLat, centerLng) {
                 const cLat = centerLat.toFixed(6);
                 const cLng = centerLng.toFixed(6);
 
-                const navBtn = document.getElementById('btn-navigate');
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                navBtn.href = isIOS
-                    ? `https://maps.apple.com/?daddr=${cLat},${cLng}&dirflg=d`
-                    : `https://www.google.com/maps/dir/?api=1&destination=${cLat},${cLng}&travelmode=driving`;
+                document.getElementById('btn-navigate').href =
+                    googleMapsNavUrl(cLat, cLng);
 
                 window.terenCenter = { lat: parseFloat(cLat), lng: parseFloat(cLng) };
             }
@@ -436,11 +447,8 @@
 
                     const cLat = window.terenCenter.lat;
                     const cLng = window.terenCenter.lng;
-                    const navBtn = document.getElementById('btn-navigate');
-                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                    navBtn.href = isIOS
-                        ? `https://maps.apple.com/?saddr=${lat},${lng}&daddr=${cLat},${cLng}&dirflg=d`
-                        : `https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination=${cLat},${cLng}&travelmode=driving`;
+                    document.getElementById('btn-navigate').href =
+                        googleMapsNavUrl(cLat, cLng, lat, lng);
                 }
 
                 function onLocationError(err) { }
