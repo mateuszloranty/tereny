@@ -5,7 +5,11 @@
  * 2. Utwórz arkusz z zakładkami: Bracia, Tereny, Grupa 1, Grupa 2, Opracowanie 1-20, …
  * 3. Wklej FILE_ID i SPREADSHEET_ID poniżej.
  * 4. Wdróż jako aplikacja internetowa (wykonuj jako: Ja, dostęp: Każdy).
- * 5. URL wdrożenia → CONFIG.DRIVE_SYNC_URL w admin.html i servant.html
+ * 5. Skopiuj URL wdrożenia do CONFIG.DRIVE_SYNC_URL w admin.html i servant.html
+ *
+ * WAŻNE — pierwsza konfiguracja uprawnień:
+ * W edytorze Apps Script uruchom raz funkcję authorizeOnce() i zaakceptuj dostęp
+ * do Dysku Google oraz Arkuszy. Bez tego zapis do zakładki Tereny nie zadziała.
  */
 
 var FILE_ID = '1mI6SMecuweOvA1xED0jQKwYcIwM11wgn';
@@ -15,10 +19,24 @@ var SHEET = {
   bracia: 'Bracia',
   tereny: 'Tereny',
   grupaPrefix: 'Grupa ',
+  templateGrupa: 'Grupa 1',
   opracowaniePrefix: 'Opracowanie '
 };
 
 var OPRACOWANIE_CHUNK = 20;
+
+/**
+ * Uruchom ręcznie w edytorze Apps Script (▶), zaakceptuj uprawnienia,
+ * potem wdróż ponownie aplikację internetową.
+ */
+function authorizeOnce() {
+  var file = DriveApp.getFileById(FILE_ID);
+  Logger.log('Drive OK: ' + file.getName());
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  Logger.log('Sheets OK: ' + ss.getName());
+  Logger.log('Zakładki: ' + ss.getSheets().map(function (s) { return s.getName(); }).join(', '));
+  return { ok: true, spreadsheet: ss.getName() };
+}
 
 // ── HTTP ────────────────────────────────────────────────────────────────────
 
@@ -36,7 +54,7 @@ function doGet(e) {
   }
   if (resource === 'bracia') return jsonOut_(readBracia_());
   if (resource === 'grupy') return jsonOut_(detectGrupy_());
-  if (resource === 'grupa') return jsonOut_(readGrupa_(p.id));
+  if (resource === 'grupa') return jsonOut_(readGrupa_(p.name || p.id));
   if (resource === 'tereny-meta') return jsonOut_(readTerenyMeta_());
   if (resource === 'opracowanie') return jsonOut_(readOpracowanie_(p.range));
   if (resource === 'bundle') {
@@ -67,7 +85,7 @@ function doPost(e) {
       return jsonOut_({ ok: true, updated: new Date().toISOString() });
     }
     if (body.resource === 'grupa') {
-      writeGrupa_(body.id, body.members, body.assignments);
+      writeGrupa_(body.name || body.id, body.members, body.assignments);
       return jsonOut_({ ok: true, updated: new Date().toISOString() });
     }
     if (body.resource === 'tereny-meta') {
@@ -83,8 +101,21 @@ function doPost(e) {
     if (body.action === 'zdaj') {
       return jsonOut_(actionZdaj_(body));
     }
+    if (body.action === 'unassign') {
+      return jsonOut_(actionUnassign_(body));
+    }
     if (body.action === 'import-tereny') {
       return jsonOut_(importTerenyMetaFromGeoJson_(body));
+    }
+    if (body.action === 'ensure-opracowanie') {
+      var geoFeatures = getTerenyGeoJson_().features || [];
+      return jsonOut_({
+        ok: true,
+        opracowanieEnsured: ensureOpracowanieSheetsFromGeo_(geoFeatures)
+      });
+    }
+    if (body.action === 'create-grupa') {
+      return jsonOut_(createGrupaFromTemplate_(body.name));
     }
 
     // Legacy: raw GeoJSON POST (admin.html)
@@ -291,10 +322,10 @@ function writeBracia_(rows) {
 function syncGroupMembersFromBracia_(rows) {
   var grupy = detectGrupy_();
   for (var g = 0; g < grupy.length; g++) {
-    var gid = String(grupy[g].id);
+    var sheetName = grupy[g].name;
     var members = [];
     for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i].grupa_id) === gid) {
+      if (bratBelongsToGrupa_(rows[i].grupa_id, sheetName)) {
         members.push({
           id_brata: rows[i].id,
           imie: rows[i].imie || '',
@@ -302,35 +333,69 @@ function syncGroupMembersFromBracia_(rows) {
         });
       }
     }
-    var existing = readGrupa_(gid);
-    writeGrupa_(gid, members, existing.assignments || []);
+    writeGrupaMembersOnly_(sheetName, members);
   }
 }
 
-// ── Grupy ───────────────────────────────────────────────────────────────────
+// ── Grupy (zakładki w jednym arkuszu Google Sheets) ─────────────────────────
+
+/** Pełna nazwa zakładki grupy — obsługa starego id „1” oraz „Grupa 1”. */
+function resolveGrupaSheetName_(idOrName) {
+  var s = String(idOrName || '').trim();
+  if (!s) return '';
+
+  var direct = findSheet_(s);
+  if (direct) return direct.getName();
+
+  var prefixed = SHEET.grupaPrefix + s;
+  var byPrefix = findSheet_(prefixed);
+  if (byPrefix) return byPrefix.getName();
+
+  return prefixed;
+}
+
+function bratBelongsToGrupa_(bratGrupaId, grupaSheetName) {
+  if (!bratGrupaId) return false;
+  return resolveGrupaSheetName_(bratGrupaId) === resolveGrupaSheetName_(grupaSheetName);
+}
 
 function detectGrupy_() {
   var matches = findSheetsByPrefix_(SHEET.grupaPrefix);
   var out = [];
   for (var i = 0; i < matches.length; i++) {
-    out.push({ id: matches[i].suffix, name: matches[i].name });
+    var sheetName = matches[i].name;
+    out.push({ id: sheetName, name: sheetName });
   }
   out.sort(function (a, b) {
-    var na = parseInt(a.id, 10);
-    var nb = parseInt(b.id, 10);
-    if (!isNaN(na) && !isNaN(nb)) return na - nb;
-    return String(a.id).localeCompare(String(b.id), 'pl', { numeric: true });
+    return a.name.localeCompare(b.name, 'pl', { numeric: true });
   });
   return out;
 }
 
-function grupaSheetName_(id) {
-  return SHEET.grupaPrefix + String(id);
+/**
+ * Nowa grupa = kopia zakładki szablonu (domyślnie „Grupa 1”) w tym samym pliku arkusza.
+ */
+function createGrupaFromTemplate_(newName) {
+  newName = String(newName || '').trim();
+  if (!newName) throw new Error('Podaj nazwę zakładki grupy');
+  if (findSheet_(newName)) throw new Error('Zakładka „' + newName + '” już istnieje');
+
+  var templateName = SHEET.templateGrupa || (SHEET.grupaPrefix + '1');
+  var template = findSheet_(templateName);
+  if (!template) {
+    throw new Error('Brak szablonu „' + templateName + '” — utwórz zakładkę wzorcową w arkuszu');
+  }
+
+  var copy = template.copyTo(ss_());
+  copy.setName(newName);
+
+  return { ok: true, id: newName, name: newName };
 }
 
-function readGrupa_(id) {
-  var sh = findSheet_(grupaSheetName_(id));
-  if (!sh) return { id: String(id), members: [], assignments: [] };
+function readGrupa_(idOrName) {
+  var sheetName = resolveGrupaSheetName_(idOrName);
+  var sh = findSheet_(sheetName);
+  if (!sh) return { id: sheetName, name: sheetName, members: [], assignments: [] };
 
   var data = sh.getDataRange().getValues();
   var members = [];
@@ -368,14 +433,56 @@ function readGrupa_(id) {
       });
     }
   }
-  return { id: String(id), members: members, assignments: assignments };
+  return { id: sheetName, name: sheetName, members: members, assignments: assignments };
 }
 
-function writeGrupa_(id, members, assignments) {
+/** Aktualizuje tylko listę członków — bez czyszczenia formatowania szablonu. */
+function writeGrupaMembersOnly_(sheetName, members) {
+  members = members || [];
+  var sh = findSheet_(sheetName);
+  if (!sh) return;
+
+  var data = sh.getDataRange().getValues();
+  var memberStartRow = 2;
+  var sectionEndRow = data.length;
+
+  for (var r = 0; r < data.length; r++) {
+    var c0 = normalizeHeader_(data[r][0]);
+    if (c0 === 'id_brata') memberStartRow = r + 2;
+    if (c0 === 'przydziały' || c0 === 'przydzialy' || c0 === 'tereny') {
+      sectionEndRow = r;
+      break;
+    }
+  }
+
+  var numRows = Math.max(0, sectionEndRow - memberStartRow);
+  if (numRows > 0) {
+    sh.getRange(memberStartRow, 1, numRows, 3).clearContent();
+  }
+
+  if (!members.length) return;
+
+  if (members.length > numRows) {
+    sh.insertRowsAfter(sectionEndRow > memberStartRow ? sectionEndRow - 1 : memberStartRow, members.length - numRows);
+  }
+
+  var values = [];
+  for (var m = 0; m < members.length; m++) {
+    values.push([members[m].id_brata, members[m].imie || '', members[m].nazwisko || '']);
+  }
+  sh.getRange(memberStartRow, 1, values.length, 3).setValues(values);
+}
+
+function writeGrupa_(idOrName, members, assignments) {
   members = members || [];
   assignments = assignments || [];
-  var name = grupaSheetName_(id);
-  var sh = ensureSheet_(name, []);
+  var name = resolveGrupaSheetName_(idOrName);
+  var sh = findSheet_(name);
+  if (sh) {
+    writeGrupaMembersOnly_(name, members);
+    return;
+  }
+  sh = ensureSheet_(name, []);
   var values = [
     ['id_brata', 'imie', 'nazwisko'],
     ['', '', '']
@@ -592,7 +699,7 @@ function importTerenyMetaFromGeoJson_(options) {
   writeTerenyMeta_(merged);
 
   var opracowanieEnsured = 0;
-  if (options.ensureOpracowanie !== false) {
+  if (options.ensureOpracowanie === true) {
     opracowanieEnsured = ensureOpracowanieSheetsFromGeo_(features);
   }
 
@@ -611,24 +718,27 @@ function ensureOpracowanieSheetsFromGeo_(features) {
     if (isSubterenFromGeo_(features[i])) continue;
     var id = getFeatureIdFromGeo_(features[i]);
     var num = parseTerenNum_(id);
-    if (!isNaN(num)) nums[num] = true;
+    if (!isNaN(num) && num > 0 && num < 900) nums[num] = true;
   }
 
   var numList = Object.keys(nums).map(function (n) { return parseInt(n, 10); }).sort(function (a, b) { return a - b; });
   if (!numList.length) return 0;
 
-  var maxNum = numList[numList.length - 1];
-  var ensured = 0;
+  var chunkStarts = {};
+  for (var j = 0; j < numList.length; j++) {
+    var n = numList[j];
+    var start = Math.floor((n - 1) / OPRACOWANIE_CHUNK) * OPRACOWANIE_CHUNK + 1;
+    chunkStarts[start] = true;
+  }
 
-  for (var start = 1; start <= maxNum; start += OPRACOWANIE_CHUNK) {
+  var ensured = 0;
+  Object.keys(chunkStarts).forEach(function (startKey) {
+    var start = parseInt(startKey, 10);
     var end = start + OPRACOWANIE_CHUNK - 1;
     var range = start + '-' + end;
     var sh = findSheet_(opracowanieSheetName_(range));
-    if (!sh) {
-      ensureOpracowanieSheet_(range, start, end);
-      ensured++;
-      continue;
-    }
+    if (!sh) return;
+
     for (var t = start; t <= end; t++) {
       if (!nums[t]) continue;
       var row = terenRowInOpracowanie_(t, start);
@@ -638,7 +748,7 @@ function ensureOpracowanieSheetsFromGeo_(features) {
         ensured++;
       }
     }
-  }
+  });
   return ensured;
 }
 
@@ -663,15 +773,13 @@ function opracowanieSheetName_(range) {
 
 function findOpracowanieSheetForTeren_(terenNr) {
   var num = parseTerenNum_(terenNr);
-  if (isNaN(num)) return null;
+  if (isNaN(num) || num < 1 || num >= 900) return null;
   var start = Math.floor((num - 1) / OPRACOWANIE_CHUNK) * OPRACOWANIE_CHUNK + 1;
   var end = start + OPRACOWANIE_CHUNK - 1;
   var range = start + '-' + end;
   var name = opracowanieSheetName_(range);
   var sh = findSheet_(name);
-  if (!sh) {
-    sh = ensureOpracowanieSheet_(range, start, end);
-  }
+  if (!sh) return null;
   return { sheet: sh, range: range, start: start, end: end };
 }
 
@@ -825,4 +933,19 @@ function actionZdaj_(body) {
   upsertTerenMeta_(meta);
 
   return { ok: true, meta: meta, zdajDate: zdajDate };
+}
+
+function actionUnassign_(body) {
+  var terenId = String(body.terenId);
+  var meta = getTerenMetaById_(terenId) || defaultMeta_(terenId, '');
+
+  meta.przypisany_typ = '';
+  meta.przypisany_id = '';
+  meta.data_przydzialu = '';
+  if (body.clearHistory) {
+    meta.completions = [];
+  }
+
+  upsertTerenMeta_(meta);
+  return { ok: true, meta: meta };
 }

@@ -83,6 +83,10 @@
         .teren-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
         .chip { display: inline-block; font-size: 11px; padding: 3px 8px; background: #e8f6f3; border-radius: 8px; margin: 2px; }
         .list-empty { text-align: center; color: #999; font-size: 14px; padding: 20px 0; }
+        .teren-item-actions { position: absolute; top: 10px; right: 8px; display: flex; gap: 4px; }
+        .action-btn { width: 28px; height: 28px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1; }
+        .action-btn.edit { background: #ebf5fb; color: #2980b9; }
+        .action-btn.delete { background: #fdecea; color: #c0392b; }
         .draw-banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 800; background: rgba(44,62,80,.92); color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; max-width: calc(100% - 32px); text-align: center; display: none; }
         .draw-banner.visible { display: block; }
         .modal { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; padding: 20px; }
@@ -153,6 +157,9 @@
                     <button class="btn-secondary" id="btn-export-tereny-csv" type="button" style="margin-bottom:10px">
                         📋 Pobierz CSV (do ręcznego wklejenia)
                     </button>
+                    <button class="btn-primary btn-success" id="btn-add-teren" type="button" style="margin-bottom:10px">
+                        ➕ Dodaj teren
+                    </button>
                     <p class="teren-count" id="teren-count">Tereny: 0</p>
                     <div class="teren-list" id="teren-list"></div>
                 </div>
@@ -167,7 +174,11 @@
                 <!-- GRUPY -->
                 <div class="panel-view" id="view-grupy">
                     <div class="panel-header"><h2>🏷️ Grupy</h2></div>
-                    <div class="group-list" id="grupy-list"></div>
+                    <p style="font-size:12px;color:#666;margin-bottom:10px;line-height:1.45">
+                        Każda grupa to osobna zakładka w tym samym arkuszu Google Sheets (jak „Grupa 1”).
+                    </p>
+                    <button class="btn-primary btn-success" id="btn-add-grupa" type="button">➕ Dodaj grupę</button>
+                    <div class="group-list" id="grupy-list" style="margin-top:12px"></div>
                     <div id="grupa-detail" style="display:none;margin-top:16px"></div>
                 </div>
 
@@ -178,6 +189,23 @@
                         <h2 id="detail-title">Teren</h2>
                     </div>
                     <div id="teren-detail-body"></div>
+                </div>
+
+                <!-- EDYCJA TERENU -->
+                <div class="panel-view" id="view-teren-editor">
+                    <div class="panel-header">
+                        <button class="btn-back" id="btn-back-editor" type="button" aria-label="Wróć">←</button>
+                        <h2 id="teren-editor-title">Teren</h2>
+                    </div>
+                    <p style="font-size:13px;color:#666;margin-bottom:12px">Narysuj lub edytuj granice terenu na mapie (narzędzia po lewej).</p>
+                    <label for="teren-editor-id">Numer terenu</label>
+                    <input type="text" id="teren-editor-id" placeholder="np. 42">
+                    <label for="teren-editor-name">Nazwa</label>
+                    <input type="text" id="teren-editor-name" placeholder="Nazwa terenu">
+                    <div class="btn-row">
+                        <button class="btn-primary btn-success" id="btn-save-teren" type="button">💾 Zapisz teren</button>
+                        <button class="btn-secondary" id="btn-clear-teren-draw" type="button">Wyczyść</button>
+                    </div>
                 </div>
 
                 <!-- RYSOWANIE SUBTERENU -->
@@ -225,12 +253,40 @@
         </div>
     </div>
 
+    <!-- Modal usuwania przydziału -->
+    <div class="modal" id="unassign-modal">
+        <div class="modal-box">
+            <h3>Usuń przydział</h3>
+            <p id="unassign-modal-text" style="font-size:14px;color:#444;margin-bottom:14px;line-height:1.45"></p>
+            <p style="font-size:12px;color:#666;margin-bottom:12px">Co zrobić z opracowaniami zapisanymi w tym przydziale?</p>
+            <button class="btn-primary btn-success" id="unassign-keep-history" type="button" style="margin-bottom:8px">Usuń przydział, zostaw opracowania</button>
+            <button class="btn-secondary" id="unassign-clear-history" type="button" style="margin-bottom:8px;background:#fdecea;color:#c0392b;border-color:#f5b7b1">Usuń przydział i opracowania</button>
+            <button class="btn-secondary" id="unassign-cancel" type="button">Anuluj</button>
+        </div>
+    </div>
+
+    <!-- Modal nowej grupy -->
+    <div class="modal" id="grupa-modal">
+        <div class="modal-box">
+            <h3>Nowa grupa</h3>
+            <p style="font-size:12px;color:#666;margin-bottom:10px">
+                Zostanie utworzona nowa zakładka jako kopia „Grupa 1” w tym samym pliku arkusza.
+            </p>
+            <label for="grupa-new-name">Nazwa zakładki</label>
+            <input type="text" id="grupa-new-name" class="full" placeholder="np. Grupa 2">
+            <div class="btn-row">
+                <button class="btn-primary btn-success" id="grupa-create-confirm" type="button">Utwórz</button>
+                <button class="btn-secondary" id="grupa-create-cancel" type="button">Anuluj</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
     <script>
     (function () {
         const CONFIG = {
-            DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbz293s8HFP61VyJ4JT5eGForyb04sArhzdgA1W3KC7EcXGzJKq_TWdL618atqk_a8bG/exec',
+            DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbzlC4onV5OTZZbVqR3ak8w-Ggx49BXO3yj8jePOZrNa1f4BpR3boVLKueCStImh_-hp/exec',
             DB_FILENAME: 'tereny.geojson',
             FETCH_TIMEOUT_MS: 45000,
             COORD_PRECISION: 5,
@@ -251,7 +307,10 @@
         let filterValue = '';
         let selectedTerrainId = null;
         let assignTerenId = null;
+        let unassignTerenId = null;
         let drawParentId = null;
+        let editingTerenId = null;
+        let isCreatingNewTeren = false;
         let currentPolygon = null;
         let isSaving = false;
 
@@ -298,6 +357,30 @@
 
         function bratLabel(b) { return (b.imie + ' ' + b.nazwisko).trim() || ('Brat ' + b.id); }
 
+        function grupaLabel(idOrName) {
+            const key = String(idOrName || '');
+            const g = grupy.find(x => String(x.id) === key || String(x.name) === key);
+            if (g) return g.name;
+            if (/^\d+$/.test(key)) {
+                const legacy = grupy.find(x => x.name === 'Grupa ' + key);
+                if (legacy) return legacy.name;
+            }
+            return key || 'Grupa';
+        }
+
+        function normalizeGrupaId(idOrName) {
+            return grupaLabel(idOrName);
+        }
+
+        function suggestNextGrupaName() {
+            const nums = grupy.map(g => {
+                const m = String(g.name || g.id).match(/^Grupa\s+(\d+)$/i);
+                return m ? parseInt(m[1], 10) : 0;
+            }).filter(n => n > 0);
+            const next = nums.length ? Math.max(...nums) + 1 : 2;
+            return 'Grupa ' + next;
+        }
+
         function getMeta(id) {
             const key = String(id);
             if (!metaById[key]) {
@@ -336,35 +419,29 @@
         async function importTerenyToSheet() {
             if (!confirm('Zaimportować wszystkie tereny z tereny.geojson do zakładki Tereny w arkuszu?\n\nIstniejące przydziały i daty zostaną zachowane.')) return;
 
-            setSaving(true);
+            setSaving(true, '⏳ Importuję tereny…');
             try {
-                const res = await apiPost({ action: 'import-tereny', ensureOpracowanie: true });
-                if (res.error) throw new Error(res.error);
+                syncMetaFromFeatures();
+                await saveTerenyMeta({ skipUi: true });
 
-                const sheetBundle = await apiGet('bundle', { light: '1' });
-                if (!sheetBundle.error) {
-                    applySheetBundle(sheetBundle);
-                    syncMetaFromFeatures();
-                    saveBundleLocal();
-                }
+                const rows = buildTerenyMetaArray();
+
+                try {
+                    const sheetBundle = await apiGet('bundle', { light: '1' });
+                    if (!sheetBundle.error) {
+                        applySheetBundle(sheetBundle);
+                        saveBundleLocal();
+                    }
+                } catch (e) { console.warn(e); }
 
                 updateSyncStatus('synced');
-                alert('✅ Import zakończony.\n\n' +
-                    'W arkuszu: ' + (res.total || 0) + ' terenów\n' +
-                    'Nowych: ' + (res.added || 0) + '\n' +
-                    'Zaktualizowanych nazw: ' + (res.updated || 0) +
-                    (res.opracowanieEnsured ? '\nWierszy w Opracowanie: ' + res.opracowanieEnsured : ''));
+                alert('✅ Zapisano ' + rows.length + ' terenów do zakładki Tereny w arkuszu.');
                 renderTerenList();
                 renderMap();
             } catch (e) {
-                console.warn('Server import failed, local fallback:', e);
-                syncMetaFromFeatures();
-                const ok = await saveTerenyMeta();
-                if (ok) {
-                    alert('✅ Zapisano tereny do arkusza (tryb lokalny).\nWdróż ponownie drive-sync.gs, aby używać pełnego importu z arkuszami Opracowanie.');
-                } else {
-                    alert('❌ Import nie powiódł się: ' + e.message);
-                }
+                console.error('Import failed:', e);
+                updateSyncStatus('error', '❌ ' + e.message);
+                alert('❌ Import nie powiódł się:\n' + e.message);
             } finally {
                 setSaving(false);
             }
@@ -391,7 +468,7 @@
 
         function assigneeLabel(meta) {
             if (!meta.przypisany_typ || !meta.przypisany_id) return '';
-            if (meta.przypisany_typ === 'grupa') return 'Grupa ' + meta.przypisany_id;
+            if (meta.przypisany_typ === 'grupa') return grupaLabel(meta.przypisany_id);
             const b = bracia.find(x => String(x.id) === String(meta.przypisany_id));
             return b ? bratLabel(b) : ('Brat ' + meta.przypisany_id);
         }
@@ -420,7 +497,7 @@
         function passesFilter(id, meta) {
             if (!filterType || !filterValue) return true;
             if (filterType === 'grupa') {
-                return meta.przypisany_typ === 'grupa' && String(meta.przypisany_id) === filterValue;
+                return meta.przypisany_typ === 'grupa' && normalizeGrupaId(meta.przypisany_id) === normalizeGrupaId(filterValue);
             }
             if (filterType === 'brat') {
                 return meta.przypisany_typ === 'brat' && String(meta.przypisany_id) === filterValue;
@@ -445,8 +522,9 @@
         }
 
         function terenyForGrupa(grupaId) {
+            const want = normalizeGrupaId(grupaId);
             return Object.values(metaById).filter(m =>
-                m.przypisany_typ === 'grupa' && String(m.przypisany_id) === String(grupaId)
+                m.przypisany_typ === 'grupa' && normalizeGrupaId(m.przypisany_id) === want
             );
         }
 
@@ -463,10 +541,11 @@
             else { el.classList.remove('visible'); el.setAttribute('hidden',''); }
         }
 
-        function setSaving(s) {
+        function setSaving(s, msg) {
             isSaving = s;
             panelSheet.classList.toggle('is-saving', s);
             panelSheet.querySelectorAll('button,input,select').forEach(el => { el.disabled = s; });
+            if (s) updateSyncStatus('saving', msg || '⏳ Zapisuję…');
         }
 
         function saveBundleLocal() {
@@ -491,11 +570,11 @@
             } catch (e) { return false; }
         }
 
-        async function fetchWithTimeout(url, ms) {
+        async function fetchWithTimeout(url, ms, init) {
             const ctrl = new AbortController();
             const timer = setTimeout(() => ctrl.abort(), ms || CONFIG.FETCH_TIMEOUT_MS);
             try {
-                const res = await fetch(url, { signal: ctrl.signal });
+                const res = await fetch(url, Object.assign({}, init || {}, { signal: ctrl.signal }));
                 clearTimeout(timer);
                 return res;
             } catch (e) {
@@ -545,11 +624,12 @@
         async function loadGrupaDataForGrupy(grupyList) {
             const data = {};
             for (const g of grupyList) {
+                const sheetName = g.name || g.id;
                 try {
-                    data[g.id] = await apiGet('grupa', { id: g.id });
+                    data[sheetName] = await apiGet('grupa', { name: sheetName });
                 } catch (e) {
-                    console.warn('grupa', g.id, e);
-                    data[g.id] = { id: String(g.id), members: [], assignments: [] };
+                    console.warn('grupa', sheetName, e);
+                    data[sheetName] = { id: sheetName, name: sheetName, members: [], assignments: [] };
                 }
             }
             return data;
@@ -573,14 +653,26 @@
             }
         }
 
-        async function apiPost(body) {
-            const res = await fetch(CONFIG.DRIVE_SYNC_URL, {
+        async function apiPost(body, timeoutMs) {
+            const res = await fetchWithTimeout(CONFIG.DRIVE_SYNC_URL, timeoutMs || CONFIG.FETCH_TIMEOUT_MS, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(body)
             });
-            if (!res.ok) throw new Error('POST status ' + res.status);
-            return res.json();
+            const text = await res.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                throw new Error(
+                    res.ok
+                        ? 'Nieprawidłowa odpowiedź serwera (nie JSON)'
+                        : ('POST status ' + res.status + ' — sprawdź wdrożenie Apps Script (dostęp: Każdy)')
+                );
+            }
+            if (!res.ok) throw new Error(data.error || ('POST status ' + res.status));
+            if (data.error) throw new Error(data.error);
+            return data;
         }
 
         function applySheetBundle(bundle) {
@@ -627,38 +719,46 @@
             }
         }
 
-        async function saveTereny() {
-            setSaving(true);
+        async function saveTereny(opts) {
+            opts = opts || {};
+            if (!opts.skipUi) setSaving(true);
             try {
                 await apiPost({ resource: 'tereny', data: database });
                 saveBundleLocal();
-                updateSyncStatus('synced');
+                if (!opts.skipUi) updateSyncStatus('synced');
                 return true;
             } catch (e) {
-                updateSyncStatus('error', '❌ ' + e.message);
-                return false;
-            } finally { setSaving(false); }
+                if (!opts.skipUi) updateSyncStatus('error', '❌ ' + e.message);
+                throw e;
+            } finally {
+                if (!opts.skipUi) setSaving(false);
+            }
         }
 
-        async function saveTerenyMeta() {
+        async function saveTerenyMeta(opts) {
+            opts = opts || {};
             syncMetaFromFeatures();
-            setSaving(true);
+            if (!opts.skipUi) setSaving(true);
             try {
-                await apiPost({ resource: 'tereny-meta', data: buildTerenyMetaArray() });
+                const data = buildTerenyMetaArray();
+                await apiPost({ resource: 'tereny-meta', data: data }, 120000);
                 saveBundleLocal();
-                updateSyncStatus('synced');
+                if (!opts.skipUi) updateSyncStatus('synced');
                 return true;
             } catch (e) {
-                updateSyncStatus('error', '❌ ' + e.message);
-                return false;
-            } finally { setSaving(false); }
+                if (!opts.skipUi) updateSyncStatus('error', '❌ ' + e.message);
+                throw e;
+            } finally {
+                if (!opts.skipUi) setSaving(false);
+            }
         }
 
         async function saveBracia() {
             grupy.forEach(g => {
-                grupaData[g.id] = grupaData[g.id] || { id: g.id, members: [], assignments: [] };
-                grupaData[g.id].members = bracia
-                    .filter(b => String(b.grupa_id) === String(g.id))
+                const key = g.name || g.id;
+                grupaData[key] = grupaData[key] || { id: key, name: key, members: [], assignments: [] };
+                grupaData[key].members = bracia
+                    .filter(b => normalizeGrupaId(b.grupa_id) === normalizeGrupaId(key))
                     .map(b => ({ id_brata: b.id, imie: b.imie, nazwisko: b.nazwisko }));
             });
             setSaving(true);
@@ -673,11 +773,12 @@
             } finally { setSaving(false); }
         }
 
-        async function saveGrupa(id) {
-            const g = grupaData[id] || { members: [], assignments: [] };
+        async function saveGrupa(idOrName) {
+            const key = normalizeGrupaId(idOrName);
+            const g = grupaData[key] || { members: [], assignments: [] };
             setSaving(true);
             try {
-                await apiPost({ resource: 'grupa', id: String(id), members: g.members, assignments: g.assignments });
+                await apiPost({ resource: 'grupa', id: key, name: key, members: g.members, assignments: g.assignments });
                 saveBundleLocal();
                 updateSyncStatus('synced');
                 return true;
@@ -723,6 +824,84 @@
             currentPolygon = e.layer;
         });
 
+        map.on(L.Draw.Event.EDITED, () => {
+            if (drawnItems.getLayers().length) currentPolygon = drawnItems.getLayers()[0];
+        });
+
+        map.on(L.Draw.Event.DELETED, () => {
+            currentPolygon = null;
+        });
+
+        map.on('click', () => {
+            if (panelView !== 'tereny' && panelView !== 'teren-detail') return;
+            clearTerenSelection();
+        });
+
+        function clearTerenSelection() {
+            if (!selectedTerrainId) return;
+            selectedTerrainId = null;
+            selectedLayer.clearLayers();
+            if (panelView === 'teren-detail') {
+                setPanelView('tereny');
+            } else {
+                renderMap();
+                renderTerenList();
+            }
+        }
+
+        function loadPolygonToDraw(feature) {
+            drawnItems.clearLayers();
+            currentPolygon = null;
+            if (!feature?.geometry?.coordinates?.[0]) return;
+            const latlngs = feature.geometry.coordinates[0].map(c => [c[1], c[0]]);
+            const polygon = L.polygon(latlngs, { color: '#3498db', fillColor: '#3498db', fillOpacity: 0.25 });
+            drawnItems.addLayer(polygon);
+            currentPolygon = polygon;
+            map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+        }
+
+        function getNextTerenId() {
+            const parents = parentFeatures();
+            if (!parents.length) return '1';
+            const nums = parents.map(f => {
+                const m = String(getFeatureId(f)).match(/^(\d+)$/);
+                return m ? parseInt(m[1], 10) : 0;
+            }).filter(n => n > 0 && n < 900);
+            return nums.length ? String(Math.max(...nums) + 1) : '1';
+        }
+
+        function buildTerenFeatureFromForm(id, name) {
+            if (!currentPolygon) return null;
+            const latlngs = currentPolygon.getLatLngs()[0];
+            const coordinates = latlngs.map(ll => [
+                parseFloat(ll.lng.toFixed(CONFIG.COORD_PRECISION)),
+                parseFloat(ll.lat.toFixed(CONFIG.COORD_PRECISION))
+            ]);
+            const first = coordinates[0], last = coordinates[coordinates.length - 1];
+            if (first[0] !== last[0] || first[1] !== last[1]) coordinates.push([first[0], first[1]]);
+
+            const existing = database.features.find(f => String(getFeatureId(f)) === String(id));
+            const props = {
+                id: id,
+                title: name,
+                name: name,
+                stroke: '#e74c3c',
+                'stroke-opacity': 1,
+                'stroke-width': 3,
+                fill: '#e74c3c',
+                'fill-opacity': 0.15,
+                created: existing?.properties?.created || new Date().toISOString()
+            };
+            if (existing?.properties?.description) props.description = existing.properties.description;
+
+            return {
+                type: 'Feature',
+                id: id,
+                geometry: { type: 'Polygon', coordinates: [coordinates] },
+                properties: props
+            };
+        }
+
         function polygonLatLngs(f) {
             return f.geometry.coordinates[0].map(c => [c[1], c[0]]);
         }
@@ -749,14 +928,19 @@
                 if (!passesFilter(id, getMeta(id))) return;
                 featureById[id] = f;
                 const layer = L.polygon(polygonLatLngs(f), terrainStyle(f)).addTo(dbLayer);
-                layer.on('click', () => { if (panelView === 'tereny' || panelView === 'teren-detail') openTerenDetail(id); });
+                layer.on('click', e => {
+                    L.DomEvent.stopPropagation(e);
+                    if (panelView === 'tereny' || panelView === 'teren-detail') openTerenDetail(id);
+                });
                 layerById[id] = layer;
             });
 
             if (selectedTerrainId && layerById[selectedTerrainId]) {
                 const f = featureById[selectedTerrainId];
                 selectedLayer.clearLayers();
-                const hl = L.polygon(polygonLatLngs(f), Object.assign(terrainStyle(f), { fillOpacity: 0.4, weight: 4 }));
+                const hl = L.polygon(polygonLatLngs(f), Object.assign(terrainStyle(f), {
+                    fillOpacity: 0.4, weight: 4, interactive: false
+                }));
                 selectedLayer.addLayer(hl);
             } else {
                 selectedLayer.clearLayers();
@@ -767,9 +951,18 @@
             }
         }
 
-        function setDrawMode(on) {
-            if (on) { map.addControl(drawControl); document.getElementById('draw-banner').classList.add('visible'); }
-            else { map.removeControl(drawControl); document.getElementById('draw-banner').classList.remove('visible'); drawnItems.clearLayers(); currentPolygon = null; }
+        function setDrawMode(on, bannerText) {
+            const banner = document.getElementById('draw-banner');
+            if (on) {
+                map.addControl(drawControl);
+                banner.textContent = bannerText || 'Rysuj granice na mapie';
+                banner.classList.add('visible');
+            } else {
+                map.removeControl(drawControl);
+                banner.classList.remove('visible');
+                drawnItems.clearLayers();
+                currentPolygon = null;
+            }
         }
 
         // ── Views ───────────────────────────────────────────────────────────
@@ -778,7 +971,11 @@
             document.querySelectorAll('.panel-view').forEach(el => el.classList.remove('active'));
             const el = document.getElementById('view-' + view);
             if (el) el.classList.add('active');
-            setDrawMode(view === 'draw');
+            const drawBanners = {
+                draw: 'Rysuj granice subterenu na mapie',
+                'teren-editor': 'Narysuj lub edytuj granice terenu na mapie'
+            };
+            setDrawMode(view === 'draw' || view === 'teren-editor', drawBanners[view]);
             if (view === 'tereny') renderTerenList();
             if (view === 'bracia') renderBraciaList();
             if (view === 'grupy') renderGrupyList();
@@ -811,7 +1008,7 @@
             document.getElementById('teren-count').textContent = 'Tereny: ' + parents.length;
 
             if (!parents.length) {
-                list.innerHTML = '<p class="list-empty">Brak terenów</p>';
+                list.innerHTML = '<p class="list-empty">Brak terenów — dodaj pierwszy</p>';
                 return;
             }
 
@@ -840,6 +1037,10 @@
             const sel = selectedTerrainId === String(id) ? ' selected' : '';
             const cls = 'teren-item' + (nested ? ' subteren' : '') + (isArchived(f) ? ' archived' : '') + sel;
             return '<div class="' + cls + '" data-id="' + escapeHtml(id) + '">' +
+                '<div class="teren-item-actions">' +
+                '<button class="action-btn edit" data-id="' + escapeHtml(id) + '" title="Edytuj" type="button">✎</button>' +
+                '<button class="action-btn delete" data-id="' + escapeHtml(id) + '" title="Usuń" type="button">✕</button>' +
+                '</div>' +
                 '<strong>' + escapeHtml(id) + '. ' + escapeHtml(getFeatureTitle(f)) + '</strong>' +
                 '<span class="teren-color-dot" style="background:' + col + '"></span>' +
                 (assignee ? '<span class="badge ' + (meta.przypisany_typ === 'grupa' ? 'badge-group' : 'badge-brat') + '">' + escapeHtml(assignee) + '</span>' : '') +
@@ -850,7 +1051,134 @@
                 '</div></div>';
         }
 
-        function bindTerenActions(container) { /* actions in detail view */ }
+        function bindTerenActions(container) {
+            container.querySelectorAll('.action-btn.edit').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    openTerenEditor(btn.dataset.id);
+                });
+            });
+            container.querySelectorAll('.action-btn.delete').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    deleteTeren(btn.dataset.id);
+                });
+            });
+        }
+
+        function openTerenEditor(id) {
+            isCreatingNewTeren = !id;
+            editingTerenId = id || null;
+            const idInput = document.getElementById('teren-editor-id');
+            const nameInput = document.getElementById('teren-editor-name');
+
+            if (id) {
+                const f = database.features.find(t => String(getFeatureId(t)) === String(id));
+                if (!f || isSubteren(f)) return;
+                document.getElementById('teren-editor-title').textContent = 'Edycja terenu';
+                idInput.value = id;
+                idInput.readOnly = true;
+                nameInput.value = getFeatureTitle(f);
+                loadPolygonToDraw(f);
+            } else {
+                const nextId = getNextTerenId();
+                document.getElementById('teren-editor-title').textContent = 'Nowy teren';
+                idInput.value = nextId;
+                idInput.readOnly = false;
+                nameInput.value = 'Teren ' + nextId;
+                drawnItems.clearLayers();
+                currentPolygon = null;
+            }
+
+            selectedTerrainId = id ? String(id) : null;
+            setPanelView('teren-editor');
+            expandSheet();
+        }
+
+        async function saveTerenEditor() {
+            const id = document.getElementById('teren-editor-id').value.trim();
+            const name = document.getElementById('teren-editor-name').value.trim() || ('Teren ' + id);
+            if (!id) { alert('Podaj numer terenu.'); return; }
+            if (!currentPolygon) { alert('Narysuj granice terenu na mapie.'); return; }
+
+            const feature = buildTerenFeatureFromForm(id, name);
+            if (!feature) return;
+
+            const existingIdx = database.features.findIndex(f => String(getFeatureId(f)) === String(id));
+            if (existingIdx !== -1 && String(editingTerenId) !== String(id)) {
+                if (!confirm('Teren „' + id + '” już istnieje. Nadpisać?')) return;
+                database.features.splice(existingIdx, 1);
+            } else if (existingIdx !== -1) {
+                database.features.splice(existingIdx, 1);
+            }
+
+            database.features.push(feature);
+            sortFeatures();
+
+            const meta = getMeta(id);
+            meta.teren_nr = id;
+            meta.nazwa = name;
+            meta.parent_teren_nr = '';
+            terenyMeta[id] = meta;
+
+            setSaving(true, '⏳ Zapisuję teren…');
+            try {
+                const okGeo = await saveTereny({ skipUi: true });
+                try { await saveTerenyMeta({ skipUi: true }); } catch (e) { console.warn(e); }
+
+                editingTerenId = id;
+                isCreatingNewTeren = false;
+                selectedTerrainId = String(id);
+                renderTerenList();
+                renderMap();
+                openTerenDetail(id);
+                updateSyncStatus('synced');
+
+                if (okGeo) alert('✅ Zapisano teren „' + name + '”');
+            } catch (e) {
+                updateSyncStatus('error', '❌ ' + e.message);
+                alert('❌ Zapis nie powiódł się:\n' + e.message);
+            } finally {
+                setSaving(false);
+            }
+        }
+
+        async function deleteTeren(id) {
+            const f = database.features.find(t => String(getFeatureId(t)) === String(id));
+            if (!f) return;
+            const subs = isSubteren(f) ? [] : subterenyOf(id);
+            const msg = subs.length
+                ? 'Usunąć teren „' + getFeatureTitle(f) + '” wraz z ' + subs.length + ' subterenami?'
+                : 'Usunąć teren „' + getFeatureTitle(f) + '”?';
+            if (!confirm(msg)) return;
+
+            setSaving(true, '⏳ Usuwam teren…');
+            try {
+                const removeIds = new Set([String(id), ...subs.map(s => String(getFeatureId(s)))]);
+                database.features = database.features.filter(t => !removeIds.has(String(getFeatureId(t))));
+                removeIds.forEach(rid => {
+                    delete metaById[rid];
+                    delete terenyMeta[rid];
+                });
+
+                if (String(selectedTerrainId) === String(id)) {
+                    selectedTerrainId = null;
+                }
+
+                sortFeatures();
+                await saveTereny({ skipUi: true });
+                try { await saveTerenyMeta({ skipUi: true }); } catch (e) { console.warn(e); }
+                setPanelView('tereny');
+                renderTerenList();
+                renderMap();
+                updateSyncStatus('synced');
+            } catch (e) {
+                updateSyncStatus('error', '❌ ' + e.message);
+                alert('❌ Usuwanie nie powiodło się:\n' + e.message);
+            } finally {
+                setSaving(false);
+            }
+        }
 
         function openTerenDetail(id) {
             selectedTerrainId = String(id);
@@ -860,11 +1188,13 @@
             document.getElementById('detail-title').textContent = id + '. ' + getFeatureTitle(f);
             const body = document.getElementById('teren-detail-body');
             const comps = meta.completions || [];
+            const hasAssignee = !!(meta.przypisany_typ && meta.przypisany_id);
             body.innerHTML =
                 '<p><strong>Przypisany:</strong> ' + (assigneeLabel(meta) || '—') + '</p>' +
+                (hasAssignee ? '<button class="btn-sm btn-secondary" id="detail-unassign" type="button" style="margin-bottom:10px;background:#fdecea;color:#c0392b">✕ Usuń przydział</button>' : '') +
                 '<label>Data przydziału</label>' +
-                '<div class="date-row"><input type="date" id="detail-assigned-date" value="' + escapeHtml(meta.data_przydzialu || '') + '">' +
-                '<button class="btn-sm btn-secondary" id="detail-clear-assigned" type="button">×</button></div>' +
+                '<div class="date-row"><input type="date" id="detail-assigned-date" value="' + escapeHtml(meta.data_przydzialu || '') + '"' + (hasAssignee ? '' : ' disabled') + '>' +
+                '<button class="btn-sm btn-secondary" id="detail-clear-assigned" type="button"' + (hasAssignee ? '' : ' disabled') + '>×</button></div>' +
                 '<label>Opracowania (bieżący przydział)</label>' +
                 '<div>' + (comps.length ? comps.map(c => '<span class="chip">' + escapeHtml(c.date) + (c.subterenId ? ' (' + escapeHtml(c.subterenId) + ')' : '') + '</span>').join('') : '<em>Brak</em>') + '</div>' +
                 '<label>Data opracowania</label>' +
@@ -875,9 +1205,12 @@
                 '<button class="btn-sm btn-warning" id="detail-complete" type="button">Opracowany</button>' +
                 '<button class="btn-sm btn-primary" id="detail-zdaj" type="button">ZDANY</button>' +
                 (!isSubteren(f) ? '<button class="btn-sm btn-secondary" id="detail-subteren" type="button">+ Subteren</button>' : '') +
+                '<button class="btn-sm btn-secondary" id="detail-edit" type="button">✎ Edytuj</button>' +
+                '<button class="btn-sm btn-secondary" id="detail-delete" type="button" style="background:#fdecea;color:#c0392b">Usuń</button>' +
                 '</div>';
 
             document.getElementById('detail-assign').onclick = () => openAssignModal(id);
+            document.getElementById('detail-unassign')?.addEventListener('click', () => openUnassignModal(id));
             document.getElementById('detail-complete').onclick = async () => {
                 const d = document.getElementById('detail-complete-date').value;
                 await postAction('complete', { terenId: id, date: d || todayISO(), subterenId: isSubteren(f) ? id : null });
@@ -896,6 +1229,11 @@
                 renderMap();
             };
             document.getElementById('detail-subteren')?.addEventListener('click', () => startSubterenDraw(id));
+            document.getElementById('detail-edit').onclick = () => {
+                if (isSubteren(f)) startSubterenDraw(getParentId(f), id);
+                else openTerenEditor(id);
+            };
+            document.getElementById('detail-delete').onclick = () => deleteTeren(id);
             document.getElementById('detail-clear-assigned').onclick = async () => {
                 meta.data_przydzialu = '';
                 await saveTerenyMeta();
@@ -935,12 +1273,23 @@
             return parentId + next;
         }
 
-        function startSubterenDraw(parentId) {
+        function startSubterenDraw(parentId, subterenId) {
             drawParentId = parentId;
-            document.getElementById('subteren-id').value = getNextSubterenId(parentId);
-            document.getElementById('subteren-name').value = 'Subteren ' + parentId;
-            drawnItems.clearLayers();
-            currentPolygon = null;
+            const idInput = document.getElementById('subteren-id');
+            idInput.readOnly = !!subterenId;
+
+            if (subterenId) {
+                const f = database.features.find(t => String(getFeatureId(t)) === String(subterenId));
+                idInput.value = subterenId;
+                document.getElementById('subteren-name').value = f ? getFeatureTitle(f) : ('Subteren ' + subterenId);
+                loadPolygonToDraw(f);
+            } else {
+                idInput.value = getNextSubterenId(parentId);
+                document.getElementById('subteren-name').value = 'Subteren ' + parentId;
+                drawnItems.clearLayers();
+                currentPolygon = null;
+            }
+
             const parent = database.features.find(f => String(getFeatureId(f)) === String(parentId));
             if (parent) map.fitBounds(L.polygon(polygonLatLngs(parent)).getBounds(), { padding: [40, 40] });
             setPanelView('draw');
@@ -1004,6 +1353,41 @@
             });
         }
 
+        function openUnassignModal(terenId) {
+            const meta = getMeta(terenId);
+            if (!meta.przypisany_typ || !meta.przypisany_id) {
+                alert('Ten teren nie ma aktywnego przydziału.');
+                return;
+            }
+
+            const comps = meta.completions || [];
+            const who = assigneeLabel(meta) || 'przypisaną osobę';
+
+            if (!comps.length) {
+                if (!confirm('Usunąć przydział: ' + who + '?')) return;
+                confirmUnassign(terenId, false);
+                return;
+            }
+
+            unassignTerenId = terenId;
+            document.getElementById('unassign-modal-text').innerHTML =
+                'Usunąć przydział dla: <strong>' + escapeHtml(who) + '</strong>?<br>' +
+                'Zapisanych opracowań w tym przydziale: ' + comps.length + '.';
+            document.getElementById('unassign-modal').classList.add('open');
+        }
+
+        async function confirmUnassign(terenId, clearHistory) {
+            document.getElementById('unassign-modal').classList.remove('open');
+            unassignTerenId = null;
+
+            const res = await postAction('unassign', { terenId: terenId, clearHistory: !!clearHistory });
+            if (!res) return;
+
+            openTerenDetail(terenId);
+            renderTerenList();
+            renderMap();
+        }
+
         function openAssignModal(terenId, options) {
             options = options || {};
             assignTerenId = terenId || null;
@@ -1030,9 +1414,45 @@
             } else {
                 grupy.forEach(g => {
                     const o = document.createElement('option');
-                    o.value = g.id; o.textContent = g.name || ('Grupa ' + g.id);
+                    o.value = g.id; o.textContent = g.name || g.id;
                     sel.appendChild(o);
                 });
+            }
+        }
+
+        function openGrupaModal() {
+            document.getElementById('grupa-new-name').value = suggestNextGrupaName();
+            document.getElementById('grupa-modal').classList.add('open');
+        }
+
+        async function createGrupa() {
+            let name = document.getElementById('grupa-new-name').value.trim();
+            if (!name) { alert('Podaj nazwę zakładki.'); return; }
+            if (!/^Grupa\s+/i.test(name)) name = 'Grupa ' + name;
+
+            setSaving(true);
+            try {
+                const res = await apiPost({ action: 'create-grupa', name: name });
+                if (res.error) throw new Error(res.error);
+
+                grupy.push({ id: res.name, name: res.name });
+                grupy.sort((a, b) => a.name.localeCompare(b.name, 'pl', { numeric: true }));
+                grupaData[res.name] = { id: res.name, name: res.name, members: [], assignments: [] };
+
+                try {
+                    grupaData[res.name] = await apiGet('grupa', { name: res.name });
+                } catch (e) { console.warn(e); }
+
+                saveBundleLocal();
+                document.getElementById('grupa-modal').classList.remove('open');
+                updateSyncStatus('synced');
+                renderGrupyList();
+                showGrupaDetail(res.name);
+            } catch (e) {
+                updateSyncStatus('error', '❌ ' + e.message);
+                alert('Nie udało się utworzyć grupy: ' + e.message);
+            } finally {
+                setSaving(false);
             }
         }
 
@@ -1066,7 +1486,9 @@
                 const assigned = terenyForBrat(b.id);
                 const chips = assigned.map(m => '<span class="chip" data-teren="' + escapeHtml(m.teren_nr) + '">' + escapeHtml(m.teren_nr) + '</span>').join('');
                 const grupaOpts = grupy.map(g =>
-                    '<option value="' + escapeHtml(g.id) + '"' + (String(b.grupa_id) === String(g.id) ? ' selected' : '') + '>Grupa ' + escapeHtml(g.id) + '</option>'
+                    '<option value="' + escapeHtml(g.id) + '"' +
+                    (normalizeGrupaId(b.grupa_id) === normalizeGrupaId(g.id) ? ' selected' : '') +
+                    '>' + escapeHtml(g.name) + '</option>'
                 ).join('');
                 return '<div class="person-item" data-id="' + escapeHtml(b.id) + '">' +
                     '<strong>' + escapeHtml(bratLabel(b)) + '</strong>' +
@@ -1138,7 +1560,7 @@
             detail.style.display = 'block';
             const tereny = terenyForGrupa(id);
             detail.innerHTML =
-                '<h3 style="font-size:15px;margin-bottom:8px">' + escapeHtml('Grupa ' + id) + '</h3>' +
+                '<h3 style="font-size:15px;margin-bottom:8px">' + escapeHtml(grupaLabel(id)) + '</h3>' +
                 '<label>Członkowie</label>' +
                 '<div>' + (g.members.length ? g.members.map(m =>
                     '<span class="chip">' + escapeHtml((m.imie || '') + ' ' + (m.nazwisko || '')) + '</span>'
@@ -1227,8 +1649,15 @@
         // ── Events ──────────────────────────────────────────────────────────
         document.querySelectorAll('.nav-tab').forEach(btn => btn.onclick = () => setTab(btn.dataset.tab));
         document.getElementById('btn-back-tereny').onclick = () => setPanelView('tereny');
+        document.getElementById('btn-back-editor').onclick = () => {
+            if (editingTerenId) openTerenDetail(editingTerenId);
+            else setPanelView('tereny');
+        };
         document.getElementById('btn-back-detail').onclick = () => openTerenDetail(drawParentId || selectedTerrainId);
         document.getElementById('btn-save-subteren').onclick = saveSubteren;
+        document.getElementById('btn-save-teren').onclick = saveTerenEditor;
+        document.getElementById('btn-clear-teren-draw').onclick = () => { drawnItems.clearLayers(); currentPolygon = null; };
+        document.getElementById('btn-add-teren').onclick = () => openTerenEditor(null);
         document.getElementById('btn-clear-draw').onclick = () => { drawnItems.clearLayers(); currentPolygon = null; };
         document.getElementById('filter-type').onchange = updateFilterValueOptions;
         document.getElementById('filter-value').onchange = e => { filterValue = e.target.value; renderTerenList(); renderMap(); };
@@ -1244,8 +1673,23 @@
         document.getElementById('assign-confirm').onclick = confirmAssign;
         document.getElementById('assign-cancel').onclick = () => document.getElementById('assign-modal').classList.remove('open');
         document.getElementById('assign-date-clear').onclick = () => { document.getElementById('assign-date').value = ''; };
+        document.getElementById('unassign-keep-history').onclick = () => {
+            if (unassignTerenId) confirmUnassign(unassignTerenId, false);
+        };
+        document.getElementById('unassign-clear-history').onclick = () => {
+            if (unassignTerenId) confirmUnassign(unassignTerenId, true);
+        };
+        document.getElementById('unassign-cancel').onclick = () => {
+            unassignTerenId = null;
+            document.getElementById('unassign-modal').classList.remove('open');
+        };
         document.getElementById('btn-import-tereny').onclick = importTerenyToSheet;
         document.getElementById('btn-export-tereny-csv').onclick = exportTerenyCsv;
+        document.getElementById('btn-add-grupa').onclick = openGrupaModal;
+        document.getElementById('grupa-create-confirm').onclick = createGrupa;
+        document.getElementById('grupa-create-cancel').onclick = () => {
+            document.getElementById('grupa-modal').classList.remove('open');
+        };
 
         // ── Init ────────────────────────────────────────────────────────────
         loadBundle().then(() => {
