@@ -1,0 +1,1508 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Admin — Tereny</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100dvh;
+            position: relative;
+        }
+
+        .map-wrap {
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ── Bottom sheet (mobile) / side panel (desktop) ── */
+        .panel-sheet {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            background: #fff;
+            border-radius: 16px 16px 0 0;
+            box-shadow: 0 -4px 28px rgba(0, 0, 0, 0.18);
+            display: flex;
+            flex-direction: column;
+            max-height: 88dvh;
+            will-change: transform;
+            touch-action: none;
+        }
+
+        .panel-sheet.is-dragging {
+            transition: none;
+        }
+
+        .panel-sheet:not(.is-dragging) {
+            transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        .sheet-handle {
+            flex-shrink: 0;
+            padding: 10px 16px 6px;
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .sheet-handle:active {
+            cursor: grabbing;
+        }
+
+        .sheet-handle-bar {
+            width: 40px;
+            height: 4px;
+            background: #ccc;
+            border-radius: 2px;
+            margin: 0 auto 8px;
+        }
+
+        .sheet-handle-title {
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .sheet-body {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding: 0 16px 24px;
+            min-height: 0;
+            touch-action: pan-y;
+        }
+
+        /* ── Sync status ── */
+        .sync-status {
+            font-size: 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .sync-status.synced {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .sync-status.local {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .sync-status.loading {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .sync-status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* ── Views ── */
+        .panel-view {
+            display: none;
+        }
+
+        .panel-view.active {
+            display: block;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .panel-header h2 {
+            flex: 1;
+            font-size: 17px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .btn-back {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: #ecf0f1;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #2c3e50;
+            flex-shrink: 0;
+        }
+
+        .btn-back:active {
+            background: #dfe6e9;
+        }
+
+        /* ── Buttons ── */
+        .btn-primary {
+            display: block;
+            width: 100%;
+            padding: 13px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .btn-primary:active {
+            background: #34495e;
+        }
+
+        .btn-primary:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:active {
+            background: #1e8449;
+        }
+
+        .btn-secondary {
+            display: block;
+            width: 100%;
+            padding: 11px;
+            background: #ecf0f1;
+            color: #2c3e50;
+            border: 2px solid #bdc3c7;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            margin-top: 8px;
+        }
+
+        .btn-secondary:active {
+            background: #dfe6e9;
+        }
+
+        .btn-draw {
+            background: #3498db;
+            color: white;
+            border-color: #2980b9;
+        }
+
+        .btn-draw:active {
+            background: #2980b9;
+        }
+
+        /* ── Form ── */
+        label {
+            display: block;
+            margin: 12px 0 4px;
+            font-weight: 600;
+            font-size: 13px;
+            color: #34495e;
+        }
+
+        input[type="text"],
+        input[type="url"] {
+            width: 100%;
+            padding: 11px 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+        }
+
+        input:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+
+        .color-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .color-row input[type="color"] {
+            width: 52px;
+            height: 44px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            padding: 2px;
+            flex-shrink: 0;
+        }
+
+        .color-row input[type="text"] {
+            flex: 1;
+        }
+
+        /* ── Territory list ── */
+        .teren-count {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .teren-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .teren-item {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 12px 90px 12px 12px;
+            font-size: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        .teren-item:active,
+        .teren-item.selected {
+            border-color: #3498db;
+            background: #ebf5fb;
+        }
+
+        .teren-item strong {
+            color: #2c3e50;
+        }
+
+        .teren-item .teren-desc {
+            font-size: 12px;
+            color: #888;
+            margin-top: 3px;
+            font-style: italic;
+        }
+
+        .teren-item .teren-color-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .teren-actions {
+            position: absolute;
+            top: 50%;
+            right: 8px;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 4px;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .action-btn.qr {
+            background: #3498db;
+        }
+
+        .action-btn.edit {
+            background: #7f8c8d;
+        }
+
+        .action-btn.delete {
+            background: #e74c3c;
+        }
+
+        .list-empty {
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+            padding: 20px 0;
+        }
+
+        /* ── Draw mode banner ── */
+        .draw-banner {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 800;
+            background: rgba(44, 62, 80, 0.92);
+            color: white;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            max-width: calc(100% - 32px);
+            text-align: center;
+            pointer-events: none;
+            display: none;
+        }
+
+        .draw-banner.visible {
+            display: block;
+        }
+
+        /* ── QR modal ── */
+        .qr-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .qr-modal.open {
+            display: flex;
+        }
+
+        .qr-modal-box {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 320px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .qr-modal-box h3 {
+            font-size: 16px;
+            margin-bottom: 16px;
+            color: #2c3e50;
+        }
+
+        #qr-output img {
+            border: 8px solid white;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .qr-modal-close {
+            margin-top: 16px;
+            width: 100%;
+        }
+
+        /* ── Loading overlay ── */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            background: rgba(240, 242, 245, 0.94);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-overlay.visible {
+            display: flex;
+        }
+
+        .loading-box {
+            text-align: center;
+            padding: 32px 24px;
+        }
+
+        .loading-spinner {
+            width: 44px;
+            height: 44px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #3498db;
+            border-radius: 50%;
+            animation: loading-spin 0.75s linear infinite;
+            margin: 0 auto 18px;
+        }
+
+        @keyframes loading-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-box p {
+            font-size: 15px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        /* ── Desktop layout ── */
+        @media (min-width: 768px) {
+            .app {
+                flex-direction: row;
+            }
+
+            .map-wrap {
+                flex: 1;
+            }
+
+            .panel-sheet {
+                position: static;
+                transform: none !important;
+                width: 420px;
+                max-width: 44vw;
+                max-height: none;
+                height: 100%;
+                border-radius: 0;
+                box-shadow: none;
+                border-left: 2px solid #e0e0e0;
+                flex-shrink: 0;
+            }
+
+            .sheet-handle {
+                display: none;
+            }
+
+            .sheet-body {
+                padding: 20px 20px 28px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="loading-overlay" id="loading-overlay" hidden>
+        <div class="loading-box">
+            <div class="loading-spinner" aria-hidden="true"></div>
+            <p id="loading-message">Ładowanie z Google Drive…</p>
+        </div>
+    </div>
+
+    <div class="app">
+        <div class="map-wrap">
+            <div id="map"></div>
+            <div class="draw-banner" id="draw-banner">
+                Użyj narzędzi na mapie, aby narysować lub edytować granice terenu
+            </div>
+        </div>
+
+        <aside class="panel-sheet" id="panel-sheet">
+            <div class="sheet-handle" id="sheet-handle">
+                <div class="sheet-handle-bar"></div>
+                <div class="sheet-handle-title" id="sheet-handle-title">Tereny</div>
+            </div>
+
+            <div class="sheet-body" id="sheet-body">
+                <div id="sync-status" class="sync-status loading">⏳ Ładowanie z Google Drive…</div>
+
+                <!-- LISTA -->
+                <div class="panel-view active" id="view-list">
+                    <div class="panel-header">
+                        <h2>📋 Baza terenów</h2>
+                    </div>
+
+                    <button class="btn-primary btn-success" id="btn-add-teren" type="button">
+                        ➕ Dodaj teren
+                    </button>
+
+                    <p class="teren-count" id="teren-count" style="margin-top: 14px;">Liczba terenów: 0</p>
+                    <div class="teren-list" id="teren-list">
+                        <p class="list-empty">Brak terenów</p>
+                    </div>
+                </div>
+
+                <!-- EDYTOR -->
+                <div class="panel-view" id="view-editor">
+                    <div class="panel-header">
+                        <button class="btn-back" id="btn-back-list" type="button" aria-label="Wróć do listy">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                        </button>
+                        <h2 id="editor-title">Nowy teren</h2>
+                    </div>
+
+                    <label for="teren-id">ID</label>
+                    <input type="text" id="teren-id" placeholder="np. 158-A">
+
+                    <label for="teren-name">Nazwa</label>
+                    <input type="text" id="teren-name" placeholder="np. Osiedle Centralne">
+
+                    <label for="teren-desc">Opis</label>
+                    <input type="text" id="teren-desc" placeholder="np. Centralna 1-20">
+
+                    <label>Kolor</label>
+                    <div class="color-row">
+                        <input type="color" id="teren-color" value="#e74c3c">
+                        <input type="text" id="teren-color-hex" value="#e74c3c">
+                    </div>
+
+                    <button class="btn-secondary btn-draw" id="btn-go-draw" type="button" style="margin-top: 16px;">
+                        ✏️ Rysuj granice
+                    </button>
+
+                    <button class="btn-primary btn-success" id="btn-save" type="button" style="margin-top: 12px;">
+                        💾 Zapisz
+                    </button>
+                </div>
+
+                <!-- RYSOWANIE -->
+                <div class="panel-view" id="view-draw">
+                    <div class="panel-header">
+                        <button class="btn-back" id="btn-back-editor" type="button" aria-label="Wróć do edycji">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                        </button>
+                        <h2>Granice terenu</h2>
+                    </div>
+
+                    <p style="font-size: 13px; color: #666; line-height: 1.5; margin-bottom: 12px;">
+                        Kliknij wielokąt na mapie, narysuj wierzchołki i zamknij klikając pierwszy punkt.
+                        Istniejące granice możesz edytować przeciągając wierzchołki.
+                    </p>
+
+                    <button class="btn-secondary" id="btn-clear-polygon" type="button">🗑️ Wyczyść wielokąt</button>
+
+                    <button class="btn-primary btn-success" id="btn-save-from-draw" type="button"
+                        style="margin-top: 12px;">
+                        💾 Zapisz teren
+                    </button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- QR modal -->
+    <div class="qr-modal" id="qr-modal" role="dialog" aria-modal="true" aria-label="Kod QR terenu">
+        <div class="qr-modal-box">
+            <h3 id="qr-modal-title">Kod QR</h3>
+            <div id="qr-output"></div>
+            <button class="btn-secondary qr-modal-close" id="btn-close-qr" type="button">Zamknij</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+    <script>
+        (function () {
+            // ============================================================
+            // KONFIGURACJA
+            // ============================================================
+            const CONFIG = {
+                DB_FILENAME: 'tereny.geojson',
+                COORD_PRECISION: 5,
+                // URL wdrożenia Apps Script (drive-sync.gs) — zapis live na Google Drive
+                DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbxYZ_0_9WA3wZBRgXKIc-1UdILEgoQIyVueTZSzamKcnUsyvHACBfXUr8rIRPA81ZR6/exec'
+            };
+
+            const currentUrl = window.location.href;
+            const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+
+            // ============================================================
+            // STAN
+            // ============================================================
+            let database = { type: 'FeatureCollection', features: [] };
+            let panelView = 'list';
+            let editingId = null; // null = nowy teren
+            let currentPolygon = null;
+            let currentColor = '#e74c3c';
+            let isDirty = false;
+
+            // Mapa — wybór i wygaszanie
+            let selectedTerrainId = null;
+            const featureById = {};
+            const layerById = {};
+            const FADED_STROKE_OPACITY = 0.55;
+            const FADED_FILL_OPACITY = 0.12;
+
+            // Bottom sheet
+            const SHEET_COLLAPSED = 56;
+            let sheetExpanded = false;
+            let sheetHeight = 0;
+            let dragStartY = 0;
+            let dragStartTranslate = 0;
+            let isDragging = false;
+            let dragMoved = false;
+
+            // ============================================================
+            // DOM
+            // ============================================================
+            const panelSheet = document.getElementById('panel-sheet');
+            const sheetHandle = document.getElementById('sheet-handle');
+            const sheetHandleTitle = document.getElementById('sheet-handle-title');
+            const syncStatusEl = document.getElementById('sync-status');
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const loadingMessage = document.getElementById('loading-message');
+            const drawBanner = document.getElementById('draw-banner');
+            const colorPicker = document.getElementById('teren-color');
+            const colorHex = document.getElementById('teren-color-hex');
+
+            // ============================================================
+            // BAZA DANYCH
+            // ============================================================
+            function loadFromLocalStorage() {
+                try {
+                    const stored = localStorage.getItem('terenyDB');
+                    if (stored) return JSON.parse(stored);
+                } catch (e) { /* ignore */ }
+                return null;
+            }
+
+            function saveToLocalStorage() {
+                localStorage.setItem('terenyDB', JSON.stringify(database));
+            }
+
+            function updateSyncStatus(status, msg) {
+                syncStatusEl.className = 'sync-status ' + status;
+                const defaults = {
+                    synced: '✅ Zsynchronizowano z Google Drive',
+                    local: '⚠️ Zmiany lokalne — oczekuje zapisu',
+                    loading: '⏳ Ładowanie z Google Drive…',
+                    saving: '⏳ Zapisuję…',
+                    error: '❌ Błąd synchronizacji'
+                };
+                syncStatusEl.textContent = msg || defaults[status] || '';
+            }
+
+            function setLoading(visible, message) {
+                if (visible) {
+                    loadingMessage.textContent = message || 'Ładowanie z Google Drive…';
+                    loadingOverlay.classList.add('visible');
+                    loadingOverlay.removeAttribute('hidden');
+                } else {
+                    loadingOverlay.classList.remove('visible');
+                    loadingOverlay.setAttribute('hidden', '');
+                }
+            }
+
+            async function loadFromServer() {
+                const fromDrive = !!CONFIG.DRIVE_SYNC_URL;
+                if (fromDrive) {
+                    setLoading(true, 'Ładowanie z Google Drive…');
+                    updateSyncStatus('loading', '⏳ Ładowanie z Google Drive…');
+                } else {
+                    updateSyncStatus('loading');
+                }
+
+                try {
+                    if (fromDrive) {
+                        try {
+                            const res = await fetch(CONFIG.DRIVE_SYNC_URL + '?t=' + Date.now());
+                            if (res.ok) {
+                                database = await res.json();
+                                saveToLocalStorage();
+                                updateSyncStatus('synced');
+                                return true;
+                            }
+                            setLoading(true, 'Google Drive niedostępny — ładowanie lokalnej kopii…');
+                            updateSyncStatus('loading', '⏳ Ładowanie lokalnej kopii…');
+                        } catch (e) {
+                            console.warn('Drive sync load failed:', e);
+                            setLoading(true, 'Google Drive niedostępny — ładowanie lokalnej kopii…');
+                            updateSyncStatus('loading', '⏳ Ładowanie lokalnej kopii…');
+                        }
+                    }
+
+                    if (window.location.protocol === 'file:') {
+                        const local = loadFromLocalStorage();
+                        if (local?.features?.length) database = local;
+                        updateSyncStatus('local', '⚠️ Tryb lokalny (file://)');
+                        return false;
+                    }
+
+                    try {
+                        const res = await fetch(CONFIG.DB_FILENAME + '?t=' + Date.now());
+                        if (res.ok) {
+                            database = await res.json();
+                            saveToLocalStorage();
+                            updateSyncStatus(
+                                fromDrive ? 'synced' : 'synced',
+                                fromDrive ? '✅ Wczytano z Google Drive' : '✅ Wczytano z serwera'
+                            );
+                            return true;
+                        }
+                        throw new Error('Status ' + res.status);
+                    } catch (e) {
+                        const local = loadFromLocalStorage();
+                        if (local?.features?.length) database = local;
+                        updateSyncStatus('local', '⚠️ Brak połączenia — dane lokalne');
+                        return false;
+                    }
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            async function saveToServer() {
+                saveToLocalStorage();
+                sortFeatures();
+
+                if (!CONFIG.DRIVE_SYNC_URL) {
+                    updateSyncStatus('local', '⚠️ Ustaw DRIVE_SYNC_URL, aby zapisywać na Drive');
+                    isDirty = true;
+                    return false;
+                }
+
+                updateSyncStatus('saving');
+                try {
+                    const res = await fetch(CONFIG.DRIVE_SYNC_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(database, null, 2),
+                        mode: 'cors'
+                    });
+                    if (!res.ok) throw new Error('Status ' + res.status);
+                    isDirty = false;
+                    updateSyncStatus('synced');
+                    return true;
+                } catch (e) {
+                    console.error('Save failed:', e);
+                    isDirty = true;
+                    updateSyncStatus('error', '❌ Nie udało się zapisać: ' + e.message);
+                    return false;
+                }
+            }
+
+            // ============================================================
+            // HELPERY FEATURE
+            // ============================================================
+            function getFeatureId(f) {
+                return f.properties?.id ?? f.id ?? '?';
+            }
+
+            function getFeatureTitle(f) {
+                const p = f.properties || {};
+                return p.title || p.name || 'Bez nazwy';
+            }
+
+            function getFeatureDescription(f) {
+                return f.properties?.description || '';
+            }
+
+            function getFeatureColor(f) {
+                const p = f.properties || {};
+                return p.stroke || p.fill || '#e74c3c';
+            }
+
+            function escapeHtml(s) {
+                return String(s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function getNextId() {
+                if (!database.features.length) return '1';
+                const nums = database.features.map(f => {
+                    const m = String(getFeatureId(f)).match(/^(\d+)/);
+                    return m ? parseInt(m[1], 10) : 0;
+                }).filter(n => !isNaN(n));
+                return nums.length ? String(Math.max(...nums) + 1) : '1';
+            }
+
+            function sortFeatures() {
+                database.features.sort((a, b) => {
+                    const aId = String(getFeatureId(a));
+                    const bId = String(getFeatureId(b));
+                    const aM = aId.match(/^(\d+)(.*)/);
+                    const bM = bId.match(/^(\d+)(.*)/);
+                    if (aM && bM) {
+                        const d = parseInt(aM[1], 10) - parseInt(bM[1], 10);
+                        return d !== 0 ? d : aM[2].localeCompare(bM[2]);
+                    }
+                    return aId.localeCompare(bId, 'pl', { numeric: true });
+                });
+            }
+
+            function terrainPageUrl() {
+                return baseUrl + 'teren.html';
+            }
+
+            function terrainUrl(id) {
+                return terrainPageUrl() + '?id=' + encodeURIComponent(id);
+            }
+
+            // ============================================================
+            // MAPA
+            // ============================================================
+            const map = L.map('map', { zoomControl: true }).setView([50.0, 20.0], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+            const drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+
+            const dbLayer = new L.FeatureGroup();
+            map.addLayer(dbLayer);
+
+            const selectedLayer = new L.FeatureGroup();
+            map.addLayer(selectedLayer);
+
+            const drawControl = new L.Control.Draw({
+                draw: {
+                    polygon: { shapeOptions: { color: currentColor } },
+                    rectangle: { shapeOptions: { color: currentColor } },
+                    polyline: false,
+                    circle: false,
+                    marker: false,
+                    circlemarker: false
+                },
+                edit: { featureGroup: drawnItems }
+            });
+
+            map.on(L.Draw.Event.CREATED, function (e) {
+                drawnItems.clearLayers();
+                e.layer.setStyle({ color: currentColor, fillColor: currentColor, fillOpacity: 0.25 });
+                drawnItems.addLayer(e.layer);
+                currentPolygon = e.layer;
+            });
+
+            map.on(L.Draw.Event.EDITED, function () {
+                if (drawnItems.getLayers().length) {
+                    currentPolygon = drawnItems.getLayers()[0];
+                }
+            });
+
+            map.on(L.Draw.Event.DELETED, function () {
+                currentPolygon = null;
+            });
+
+            function setDrawControlVisible(visible) {
+                if (visible) {
+                    map.addControl(drawControl);
+                } else {
+                    map.removeControl(drawControl);
+                }
+            }
+
+            function polygonLatLngs(f) {
+                return f.geometry.coordinates[0].map(c => [c[1], c[0]]);
+            }
+
+            function terrainPolygonStyle(f, faded) {
+                const stroke = getFeatureColor(f);
+                const fill = f.properties.fill || stroke;
+                const fillOpacity = f.properties['fill-opacity'] || 0.1;
+                const strokeWidth = f.properties['stroke-width'] || 2;
+                const strokeOpacity = f.properties['stroke-opacity'] || 1;
+
+                if (faded) {
+                    return {
+                        color: stroke,
+                        fillColor: fill,
+                        opacity: FADED_STROKE_OPACITY,
+                        fillOpacity: FADED_FILL_OPACITY,
+                        weight: 2,
+                        dashArray: '5, 5'
+                    };
+                }
+
+                return {
+                    color: stroke,
+                    opacity: strokeOpacity,
+                    fillColor: fill,
+                    fillOpacity: fillOpacity,
+                    weight: strokeWidth,
+                    dashArray: '5, 5'
+                };
+            }
+
+            function applyTerrainFading() {
+                Object.keys(layerById).forEach(id => {
+                    const layer = layerById[id];
+                    const feature = featureById[id];
+                    if (!layer || !feature) return;
+
+                    if (selectedTerrainId && String(id) === String(selectedTerrainId)) {
+                        layer.setStyle({ opacity: 0, fillOpacity: 0, weight: 0 });
+                        return;
+                    }
+
+                    layer.setStyle(terrainPolygonStyle(feature, !!selectedTerrainId));
+                });
+            }
+
+            function bindTerrainMapClick(layer, id) {
+                layer.on('click', function (e) {
+                    L.DomEvent.stopPropagation(e);
+                    if (panelView === 'list') {
+                        showTerenOnMap(id);
+                        expandSheet();
+                    }
+                });
+                layer.on('mouseover', function () {
+                    if (panelView === 'list') map.getContainer().style.cursor = 'pointer';
+                });
+                layer.on('mouseout', function () {
+                    map.getContainer().style.cursor = '';
+                });
+            }
+
+            function showTerenOnMap(id, options) {
+                options = options || {};
+                const feature = featureById[id];
+                if (!feature) return;
+
+                selectedTerrainId = String(id);
+                selectedLayer.clearLayers();
+
+                const stroke = getFeatureColor(feature);
+                const fill = feature.properties.fill || stroke;
+                const fillOpacity = feature.properties['fill-opacity'] || 0.3;
+                const strokeWidth = feature.properties['stroke-width'] || 3;
+                const strokeOpacity = feature.properties['stroke-opacity'] || 1;
+
+                const polygon = L.polygon(polygonLatLngs(feature), {
+                    color: stroke,
+                    opacity: strokeOpacity,
+                    fillColor: fill,
+                    fillOpacity: fillOpacity,
+                    weight: strokeWidth
+                });
+                bindTerrainMapClick(polygon, id);
+                selectedLayer.addLayer(polygon);
+                applyTerrainFading();
+
+                if (options.fit !== false) {
+                    map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+                }
+
+                highlightListItem(id, options);
+            }
+
+            function loadPolygonToDraw(feature) {
+                drawnItems.clearLayers();
+                currentPolygon = null;
+                if (!feature?.geometry?.coordinates?.[0]) return;
+
+                const latlngs = feature.geometry.coordinates[0].map(c => [c[1], c[0]]);
+                const stroke = getFeatureColor(feature);
+                const polygon = L.polygon(latlngs, {
+                    color: stroke,
+                    fillColor: stroke,
+                    fillOpacity: 0.25
+                });
+                drawnItems.addLayer(polygon);
+                currentPolygon = polygon;
+                map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+            }
+
+            function renderDbOnMap(fitAll) {
+                dbLayer.clearLayers();
+                Object.keys(featureById).forEach(k => delete featureById[k]);
+                Object.keys(layerById).forEach(k => delete layerById[k]);
+
+                database.features.forEach(f => {
+                    const id = getFeatureId(f);
+                    featureById[id] = f;
+
+                    const title = getFeatureTitle(f);
+                    const desc = getFeatureDescription(f);
+                    const popup = desc
+                        ? '<b>' + escapeHtml(title) + '</b><br>ID: ' + escapeHtml(id) +
+                        '<br><em>' + escapeHtml(desc) + '</em>'
+                        : '<b>' + escapeHtml(title) + '</b><br>ID: ' + escapeHtml(id);
+
+                    const layer = L.polygon(
+                        polygonLatLngs(f),
+                        terrainPolygonStyle(f, !!selectedTerrainId)
+                    ).addTo(dbLayer).bindPopup(popup);
+
+                    bindTerrainMapClick(layer, id);
+                    layerById[id] = layer;
+                });
+
+                if (selectedTerrainId && !featureById[selectedTerrainId]) {
+                    selectedTerrainId = null;
+                    selectedLayer.clearLayers();
+                }
+
+                applyTerrainFading();
+
+                if (selectedTerrainId && featureById[selectedTerrainId]) {
+                    showTerenOnMap(selectedTerrainId, { fit: false, scroll: false });
+                } else if (
+                    fitAll !== false &&
+                    database.features.length &&
+                    dbLayer.getBounds().isValid() &&
+                    panelView === 'list' &&
+                    !selectedTerrainId
+                ) {
+                    map.fitBounds(dbLayer.getBounds(), { padding: [50, 50] });
+                }
+            }
+
+            // ============================================================
+            // WIDOKI PANELU
+            // ============================================================
+            function setPanelView(view) {
+                panelView = view;
+                document.querySelectorAll('.panel-view').forEach(el => el.classList.remove('active'));
+                document.getElementById('view-' + view).classList.add('active');
+
+                const titles = { list: 'Tereny', editor: 'Edycja', draw: 'Rysowanie' };
+                sheetHandleTitle.textContent = titles[view] || 'Tereny';
+
+                const inDraw = view === 'draw';
+                setDrawControlVisible(inDraw);
+                drawBanner.classList.toggle('visible', inDraw);
+
+                if (view === 'list') {
+                    renderTerenList();
+                    renderDbOnMap();
+                }
+
+                if (view !== 'draw') {
+                    expandSheet();
+                }
+
+                setTimeout(() => map.invalidateSize(), 50);
+            }
+
+            function openEditor(id) {
+                editingId = id;
+
+                if (id) {
+                    const f = database.features.find(t => String(getFeatureId(t)) === String(id));
+                    if (!f) return;
+                    document.getElementById('editor-title').textContent = 'Edycja terenu';
+                    document.getElementById('teren-id').value = getFeatureId(f);
+                    document.getElementById('teren-name').value = getFeatureTitle(f);
+                    document.getElementById('teren-desc').value = getFeatureDescription(f);
+                    const col = getFeatureColor(f);
+                    colorPicker.value = col;
+                    colorHex.value = col;
+                    currentColor = col;
+                    loadPolygonToDraw(f);
+                    showTerenOnMap(id, { fit: false, scroll: false });
+                } else {
+                    const nextId = getNextId();
+                    document.getElementById('editor-title').textContent = 'Nowy teren';
+                    document.getElementById('teren-id').value = nextId;
+                    document.getElementById('teren-name').value = 'Teren ' + nextId;
+                    document.getElementById('teren-desc').value = '';
+                    colorPicker.value = '#e74c3c';
+                    colorHex.value = '#e74c3c';
+                    currentColor = '#e74c3c';
+                    drawnItems.clearLayers();
+                    currentPolygon = null;
+                    selectedTerrainId = null;
+                    selectedLayer.clearLayers();
+                    applyTerrainFading();
+                }
+
+                document.getElementById('teren-id').readOnly = !!id;
+                setPanelView('editor');
+                expandSheet();
+            }
+
+            function openDrawMode() {
+                const id = document.getElementById('teren-id').value.trim();
+                if (!id) {
+                    alert('Podaj ID terenu przed rysowaniem.');
+                    return;
+                }
+
+                if (!currentPolygon) {
+                    const existing = database.features.find(f => String(getFeatureId(f)) === String(id));
+                    if (existing) loadPolygonToDraw(existing);
+                }
+
+                setPanelView('draw');
+                collapseSheet();
+            }
+
+            // ============================================================
+            // LISTA TERENÓW
+            // ============================================================
+            function renderTerenList() {
+                const list = document.getElementById('teren-list');
+                document.getElementById('teren-count').textContent =
+                    'Liczba terenów: ' + database.features.length;
+
+                if (!database.features.length) {
+                    list.innerHTML = '<p class="list-empty">Brak terenów — dodaj pierwszy</p>';
+                    return;
+                }
+
+                list.innerHTML = database.features.map(f => {
+                    const id = getFeatureId(f);
+                    const title = getFeatureTitle(f);
+                    const desc = getFeatureDescription(f);
+                    const color = getFeatureColor(f);
+                    const selected = selectedTerrainId === String(id) ? ' selected' : '';
+                    return (
+                        '<div class="teren-item' + selected + '" data-id="' + escapeHtml(String(id)) + '">' +
+                        '<div class="teren-actions">' +
+                        '<button class="action-btn qr" data-id="' + escapeHtml(String(id)) + '" ' +
+                        'title="Kod QR" aria-label="Kod QR">QR</button>' +
+                        '<button class="action-btn edit" data-id="' + escapeHtml(String(id)) + '" ' +
+                        'title="Edytuj" aria-label="Edytuj">' +
+                        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                        'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+                        '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>' +
+                        '<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>' +
+                        '<button class="action-btn delete" data-id="' + escapeHtml(String(id)) + '" ' +
+                        'title="Usuń" aria-label="Usuń">✕</button>' +
+                        '</div>' +
+                        '<strong>' + escapeHtml(String(id)) + '. ' + escapeHtml(title) + '</strong>' +
+                        '<span class="teren-color-dot" style="background:' + escapeHtml(color) + '"></span>' +
+                        (desc ? '<div class="teren-desc">' + escapeHtml(desc) + '</div>' : '') +
+                        '</div>'
+                    );
+                }).join('');
+
+                list.querySelectorAll('.teren-item').forEach(item => {
+                    item.addEventListener('click', function (e) {
+                        if (e.target.closest('.action-btn')) return;
+                        showTerenOnMap(this.dataset.id);
+                    });
+                });
+
+                list.querySelectorAll('.action-btn.edit').forEach(btn => {
+                    btn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        openEditor(this.dataset.id);
+                    });
+                });
+
+                list.querySelectorAll('.action-btn.delete').forEach(btn => {
+                    btn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        const id = this.dataset.id;
+                        const f = database.features.find(t => String(getFeatureId(t)) === String(id));
+                        if (!confirm('Usunąć „' + getFeatureTitle(f) + '”?')) return;
+                        if (String(selectedTerrainId) === String(id)) {
+                            selectedTerrainId = null;
+                            selectedLayer.clearLayers();
+                        }
+                        database.features = database.features.filter(
+                            t => String(getFeatureId(t)) !== String(id)
+                        );
+                        saveToServer().then(() => {
+                            renderTerenList();
+                            renderDbOnMap();
+                        });
+                    });
+                });
+
+                list.querySelectorAll('.action-btn.qr').forEach(btn => {
+                    btn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        showQr(this.dataset.id);
+                    });
+                });
+            }
+
+            function highlightListItem(id, options) {
+                options = options || {};
+                document.querySelectorAll('.teren-item').forEach(el => el.classList.remove('selected'));
+                const safe = CSS.escape ? CSS.escape(String(id)) : String(id);
+                const item = document.querySelector('.teren-item[data-id="' + safe + '"]');
+                if (item) {
+                    item.classList.add('selected');
+                    if (options.scroll !== false) {
+                        item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                }
+            }
+
+            // ============================================================
+            // ZAPIS TERENU
+            // ============================================================
+            function buildFeatureFromForm() {
+                const id = document.getElementById('teren-id').value.trim();
+                if (!id) { alert('Podaj ID terenu!'); return null; }
+                if (!currentPolygon) { alert('Narysuj granice terenu!'); return null; }
+
+                const name = document.getElementById('teren-name').value.trim() || 'Teren ' + id;
+                const desc = document.getElementById('teren-desc').value.trim();
+
+                const latlngs = currentPolygon.getLatLngs()[0];
+                const coordinates = latlngs.map(ll => [
+                    parseFloat(ll.lng.toFixed(CONFIG.COORD_PRECISION)),
+                    parseFloat(ll.lat.toFixed(CONFIG.COORD_PRECISION))
+                ]);
+
+                const first = coordinates[0];
+                const last = coordinates[coordinates.length - 1];
+                if (first[0] !== last[0] || first[1] !== last[1]) {
+                    coordinates.push([first[0], first[1]]);
+                }
+
+                const feature = {
+                    type: 'Feature',
+                    id: id,
+                    geometry: { type: 'Polygon', coordinates: [coordinates] },
+                    properties: {
+                        id: id,
+                        title: name,
+                        name: name,
+                        stroke: currentColor,
+                        'stroke-opacity': 1,
+                        'stroke-width': 3,
+                        fill: currentColor,
+                        'fill-opacity': 0.15,
+                        created: new Date().toISOString()
+                    }
+                };
+
+                if (desc) feature.properties.description = desc;
+                return feature;
+            }
+
+            async function saveCurrentTeren() {
+                const feature = buildFeatureFromForm();
+                if (!feature) return;
+
+                const id = feature.properties.id;
+                const existingIdx = database.features.findIndex(
+                    f => String(getFeatureId(f)) === String(id)
+                );
+
+                if (existingIdx !== -1 && String(editingId) !== String(id)) {
+                    if (!confirm('ID „' + id + '” już istnieje. Nadpisać?')) return;
+                    database.features.splice(existingIdx, 1);
+                } else if (existingIdx !== -1) {
+                    const old = database.features[existingIdx];
+                    if (old.properties.created) feature.properties.created = old.properties.created;
+                    database.features.splice(existingIdx, 1);
+                }
+
+                database.features.push(feature);
+                const saved = await saveToServer();
+
+                selectedTerrainId = String(id);
+                renderTerenList();
+                renderDbOnMap(false);
+                editingId = id;
+                setPanelView('list');
+
+                if (saved) {
+                    alert('✅ Zapisano „' + feature.properties.title + '”');
+                } else if (!CONFIG.DRIVE_SYNC_URL) {
+                    alert('Zapisano lokalnie. Ustaw DRIVE_SYNC_URL, aby synchronizować z Google Drive.');
+                }
+            }
+
+            // ============================================================
+            // QR
+            // ============================================================
+            function showQr(id) {
+                const url = terrainUrl(id);
+                const f = database.features.find(t => String(getFeatureId(t)) === String(id));
+                document.getElementById('qr-modal-title').textContent =
+                    'QR — ' + (f ? getFeatureTitle(f) : id);
+
+                const qrDiv = document.getElementById('qr-output');
+                qrDiv.innerHTML = '';
+                new QRCode(qrDiv, {
+                    text: url,
+                    width: 220,
+                    height: 220,
+                    colorDark: '#2c3e50',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+
+                document.getElementById('qr-modal').classList.add('open');
+            }
+
+            // ============================================================
+            // BOTTOM SHEET
+            // ============================================================
+            function measureSheet() {
+                sheetHeight = panelSheet.offsetHeight;
+            }
+
+            function setSheetTranslate(px) {
+                const max = Math.max(0, sheetHeight - SHEET_COLLAPSED);
+                const clamped = Math.max(0, Math.min(max, px));
+                panelSheet.style.transform = 'translateY(' + clamped + 'px)';
+                return clamped;
+            }
+
+            function expandSheet() {
+                sheetExpanded = true;
+                measureSheet();
+                setSheetTranslate(0);
+            }
+
+            function collapseSheet() {
+                sheetExpanded = false;
+                measureSheet();
+                setSheetTranslate(sheetHeight - SHEET_COLLAPSED);
+            }
+
+            function snapSheet(currentTranslate) {
+                const max = sheetHeight - SHEET_COLLAPSED;
+                const threshold = max * 0.4;
+                if (currentTranslate < threshold) {
+                    expandSheet();
+                } else {
+                    collapseSheet();
+                }
+            }
+
+            function initBottomSheet() {
+                if (window.matchMedia('(min-width: 768px)').matches) {
+                    panelSheet.style.transform = '';
+                    return;
+                }
+
+                measureSheet();
+                collapseSheet();
+
+                function onPointerDown(e) {
+                    if (window.matchMedia('(min-width: 768px)').matches) return;
+                    isDragging = true;
+                    dragMoved = false;
+                    panelSheet.classList.add('is-dragging');
+                    dragStartY = e.clientY;
+                    const m = panelSheet.style.transform.match(/translateY\(([-\d.]+)px\)/);
+                    dragStartTranslate = m ? parseFloat(m[1]) : 0;
+                    sheetHandle.setPointerCapture(e.pointerId);
+                }
+
+                function onPointerMove(e) {
+                    if (!isDragging) return;
+                    const dy = e.clientY - dragStartY;
+                    if (Math.abs(dy) > 4) dragMoved = true;
+                    setSheetTranslate(dragStartTranslate + dy);
+                }
+
+                function onPointerUp(e) {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    panelSheet.classList.remove('is-dragging');
+                    sheetHandle.releasePointerCapture(e.pointerId);
+                    const m = panelSheet.style.transform.match(/translateY\(([-\d.]+)px\)/);
+                    snapSheet(m ? parseFloat(m[1]) : 0);
+                }
+
+                sheetHandle.addEventListener('pointerdown', onPointerDown);
+                sheetHandle.addEventListener('pointermove', onPointerMove);
+                sheetHandle.addEventListener('pointerup', onPointerUp);
+                sheetHandle.addEventListener('pointercancel', onPointerUp);
+
+                sheetHandle.addEventListener('click', function () {
+                    if (window.matchMedia('(min-width: 768px)').matches) return;
+                    if (dragMoved) return;
+                    if (sheetExpanded) collapseSheet();
+                    else expandSheet();
+                });
+
+                window.addEventListener('resize', function () {
+                    if (window.matchMedia('(min-width: 768px)').matches) {
+                        panelSheet.style.transform = '';
+                    } else {
+                        measureSheet();
+                        sheetExpanded ? expandSheet() : collapseSheet();
+                    }
+                    map.invalidateSize();
+                });
+            }
+
+            // ============================================================
+            // ZDARZENIA
+            // ============================================================
+            document.getElementById('btn-add-teren').addEventListener('click', () => openEditor(null));
+            document.getElementById('btn-back-list').addEventListener('click', () => setPanelView('list'));
+            document.getElementById('btn-back-editor').addEventListener('click', () => setPanelView('editor'));
+            document.getElementById('btn-go-draw').addEventListener('click', openDrawMode);
+            document.getElementById('btn-save').addEventListener('click', saveCurrentTeren);
+            document.getElementById('btn-save-from-draw').addEventListener('click', saveCurrentTeren);
+
+            document.getElementById('btn-clear-polygon').addEventListener('click', function () {
+                drawnItems.clearLayers();
+                currentPolygon = null;
+            });
+
+            document.getElementById('btn-close-qr').addEventListener('click', function () {
+                document.getElementById('qr-modal').classList.remove('open');
+            });
+
+            document.getElementById('qr-modal').addEventListener('click', function (e) {
+                if (e.target === this) this.classList.remove('open');
+            });
+
+            colorPicker.addEventListener('input', function () {
+                colorHex.value = this.value;
+                currentColor = this.value;
+                if (currentPolygon) {
+                    currentPolygon.setStyle({ color: currentColor, fillColor: currentColor });
+                }
+            });
+
+            colorHex.addEventListener('input', function () {
+                if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
+                    colorPicker.value = this.value;
+                    currentColor = this.value;
+                    if (currentPolygon) {
+                        currentPolygon.setStyle({ color: currentColor, fillColor: currentColor });
+                    }
+                }
+            });
+
+            // ============================================================
+            // INIT
+            // ============================================================
+            loadFromServer().then(() => {
+                renderTerenList();
+                renderDbOnMap();
+                initBottomSheet();
+                expandSheet();
+            });
+
+        })();
+    </script>
+
+</body>
+
+</html>
