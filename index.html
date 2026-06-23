@@ -7,6 +7,8 @@
           maximum-scale=1.0, user-scalable=no">
     <title>Lista terenów — Mapa terenu</title>
 
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
     <style>
         * {
             box-sizing: border-box;
@@ -14,12 +16,19 @@
             padding: 0;
         }
 
+        html {
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #f5f5f5;
-            min-height: 100vh;
+            height: 100vh;
+            height: 100dvh;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         .header {
@@ -45,9 +54,27 @@
             display: none;
         }
 
-        .browse-root {
+        .browse-layout {
             flex: 1;
-            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .browse-map {
+            flex: 1 1 42%;
+            min-height: 160px;
+            max-height: 50%;
+            z-index: 0;
+        }
+
+        .browse-root {
+            flex: 1 1 58%;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
             background: #f5f5f5;
         }
 
@@ -55,6 +82,25 @@
             max-width: 560px;
             margin: 0 auto;
             padding: 16px 16px 28px;
+        }
+
+        @media (min-width: 768px) {
+            .browse-layout {
+                flex-direction: row;
+            }
+
+            .browse-map {
+                flex: 1 1 auto;
+                min-height: 0;
+                max-height: none;
+            }
+
+            .browse-root {
+                flex: 0 0 440px;
+                width: 440px;
+                max-width: 44vw;
+                border-left: 1px solid #e0e0e0;
+            }
         }
 
         .browse-toolbar {
@@ -138,27 +184,66 @@
             gap: 10px;
         }
 
-        .terrain-list a {
-            display: block;
+        .terrain-list .terrain-item {
+            display: flex;
+            align-items: stretch;
             background: white;
             border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e8e8e8;
+            overflow: hidden;
+            transition: box-shadow 0.15s, border-color 0.15s;
+        }
+
+        .terrain-list .terrain-item.selected {
+            border-color: #356AC3;
+            box-shadow: 0 2px 12px rgba(53, 106, 195, 0.2);
+        }
+
+        .terrain-list .terrain-select {
+            flex: 1;
+            display: block;
+            text-align: left;
+            border: none;
+            background: transparent;
             padding: 14px 16px;
-            text-decoration: none;
+            cursor: pointer;
             color: #2c3e50;
             font-size: 15px;
             font-weight: 600;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e8e8e8;
-            transition: transform 0.1s, box-shadow 0.15s;
+            font-family: inherit;
+            transition: background 0.1s;
         }
 
-        .terrain-list a:active {
-            transform: scale(0.99);
+        .terrain-list .terrain-select:active {
+            background: #f8f8f8;
         }
 
-        .terrain-list a:focus-visible {
+        .terrain-list .terrain-select:focus-visible {
             outline: 2px solid #356AC3;
-            outline-offset: 2px;
+            outline-offset: -2px;
+        }
+
+        .terrain-list .terrain-open {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 14px;
+            color: #356AC3;
+            border-left: 1px solid #e8e8e8;
+            flex-shrink: 0;
+            text-decoration: none;
+            transition: background 0.1s, color 0.1s;
+        }
+
+        .terrain-list .terrain-open:hover {
+            background: #f0f4fb;
+            color: #2a5599;
+        }
+
+        .terrain-list .terrain-open:focus-visible {
+            outline: 2px solid #356AC3;
+            outline-offset: -2px;
         }
 
         .terrain-list .tid {
@@ -167,6 +252,12 @@
             font-weight: 500;
             color: #999;
             margin-top: 6px;
+        }
+
+        .terrain-list a {
+            display: block;
+            text-decoration: none;
+            color: inherit;
         }
 
         .terrain-list .create-new a {
@@ -205,8 +296,12 @@
         <div class="subtitle" id="subtitle">Ładowanie bazy…</div>
     </div>
 
-    <main id="browse-root" class="browse-root"></main>
+    <div class="browse-layout" id="browse-layout" hidden>
+        <div id="map" class="browse-map" aria-label="Mapa terenów"></div>
+        <main id="browse-root" class="browse-root"></main>
+    </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         (function () {
             var sp = new URLSearchParams(window.location.search);
@@ -231,11 +326,30 @@
 
             function showError(message) {
                 document.getElementById('subtitle').textContent = '';
+                document.getElementById('map').hidden = true;
                 document.getElementById('browse-root').innerHTML =
                     '<div class="browse-inner"><p class="browse-count error">' +
                     escapeHtml(message) +
                     '</p></div>';
+                document.getElementById('browse-layout').hidden = false;
             }
+
+            var map = null;
+            var dbLayer = null;
+            var selectedLayer = null;
+            var featureById = {};
+            var layerById = {};
+            var selectedTerrainId = null;
+
+            var FADED_STROKE_OPACITY = 0.55;
+            var FADED_FILL_OPACITY = 0.12;
+
+            var openTabIcon =
+                '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" ' +
+                'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+                'stroke-linejoin="round" aria-hidden="true">' +
+                '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>' +
+                '<polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
 
             function escapeHtml(s) {
                 return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -244,7 +358,7 @@
             function createNewItemHtml() {
                 return (
                     '<li class="create-new">' +
-                    '<a href="generator.html">' +
+                    '<a href="admin.html">' +
                     '<span class="create-icon" aria-hidden="true">+</span>' +
                     '<span class="create-label">Stwórz nowy teren</span>' +
                     '</a></li>'
@@ -255,6 +369,178 @@
                 const p = feature.properties || {};
                 const id = terrainFeatureId(feature);
                 return p.title || p.name || 'Teren ' + id;
+            }
+
+            function terrainDescription(feature) {
+                const p = feature.properties || {};
+                return p.description || '';
+            }
+
+            function polygonLatLngs(feature) {
+                return feature.geometry.coordinates[0].map(function (c) {
+                    return [c[1], c[0]];
+                });
+            }
+
+            function terrainPolygonStyle(feature, faded) {
+                const stroke = feature.properties.stroke || feature.properties.fill || '#e74c3c';
+                const fill = feature.properties.fill || feature.properties.stroke || '#e74c3c';
+                const fillOpacity = feature.properties['fill-opacity'] || 0.1;
+                const strokeWidth = feature.properties['stroke-width'] || 2;
+                const strokeOpacity = feature.properties['stroke-opacity'] || 1;
+
+                if (faded) {
+                    return {
+                        color: stroke,
+                        fillColor: fill,
+                        opacity: FADED_STROKE_OPACITY,
+                        fillOpacity: FADED_FILL_OPACITY,
+                        weight: 2,
+                        dashArray: '5, 5'
+                    };
+                }
+
+                return {
+                    color: stroke,
+                    opacity: strokeOpacity,
+                    fillColor: fill,
+                    fillOpacity: fillOpacity,
+                    weight: strokeWidth,
+                    dashArray: '5, 5'
+                };
+            }
+
+            function applyTerrainFading() {
+                Object.keys(layerById).forEach(function (id) {
+                    const layer = layerById[id];
+                    const feature = featureById[id];
+                    if (!layer || !feature) return;
+
+                    if (selectedTerrainId && String(id) === String(selectedTerrainId)) {
+                        layer.setStyle({ opacity: 0, fillOpacity: 0, weight: 0 });
+                        return;
+                    }
+
+                    layer.setStyle(terrainPolygonStyle(feature, !!selectedTerrainId));
+                });
+            }
+
+            function bindTerrainMapClick(layer, id) {
+                layer.on('click', function (e) {
+                    L.DomEvent.stopPropagation(e);
+                    showTerenOnMap(id);
+                });
+                layer.on('mouseover', function () {
+                    map.getContainer().style.cursor = 'pointer';
+                });
+                layer.on('mouseout', function () {
+                    map.getContainer().style.cursor = '';
+                });
+            }
+
+            function highlightListItem(id, options) {
+                options = options || {};
+                document.querySelectorAll('.terrain-item').forEach(function (el) {
+                    el.classList.remove('selected');
+                });
+                const safeId = window.CSS && CSS.escape
+                    ? CSS.escape(String(id))
+                    : String(id).replace(/["\\]/g, '\\$&');
+                const item = document.querySelector('.terrain-item[data-id="' + safeId + '"]');
+                if (item) {
+                    item.classList.add('selected');
+                    if (options.scroll !== false) {
+                        item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                }
+            }
+
+            function initMap() {
+                if (map) return;
+                map = L.map('map').setView([50.0, 20.0], 10);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19
+                }).addTo(map);
+                dbLayer = L.featureGroup().addTo(map);
+                selectedLayer = L.featureGroup().addTo(map);
+            }
+
+            function renderTerrainsOnMap(features, fitAll) {
+                if (!map) return;
+                dbLayer.clearLayers();
+                featureById = {};
+                layerById = {};
+
+                features.forEach(function (f) {
+                    const id = terrainFeatureId(f);
+                    featureById[id] = f;
+
+                    const label = terrainLabel(f);
+                    const desc = terrainDescription(f);
+                    const popupText = desc
+                        ? '<b>' + escapeHtml(label) + '</b><br>ID: ' + escapeHtml(String(id)) +
+                        '<br><em>' + escapeHtml(desc) + '</em>'
+                        : '<b>' + escapeHtml(label) + '</b><br>ID: ' + escapeHtml(String(id));
+
+                    const layer = L.polygon(
+                        polygonLatLngs(f),
+                        terrainPolygonStyle(f, !!selectedTerrainId)
+                    ).addTo(dbLayer).bindPopup(popupText);
+
+                    bindTerrainMapClick(layer, id);
+                    layerById[id] = layer;
+                });
+
+                if (selectedTerrainId && !featureById[selectedTerrainId]) {
+                    selectedTerrainId = null;
+                    selectedLayer.clearLayers();
+                }
+
+                applyTerrainFading();
+
+                if (fitAll && features.length && dbLayer.getBounds().isValid()) {
+                    map.fitBounds(dbLayer.getBounds(), { padding: [40, 40] });
+                }
+            }
+
+            function showTerenOnMap(id, options) {
+                options = options || {};
+                const feature = featureById[id];
+                if (!feature || !map) return;
+
+                selectedTerrainId = String(id);
+                selectedLayer.clearLayers();
+
+                const stroke = feature.properties.stroke || feature.properties.fill || '#e74c3c';
+                const fill = feature.properties.fill || feature.properties.stroke || '#e74c3c';
+                const fillOpacity = feature.properties['fill-opacity'] || 0.3;
+                const strokeWidth = feature.properties['stroke-width'] || 3;
+                const strokeOpacity = feature.properties['stroke-opacity'] || 1;
+
+                const polygon = L.polygon(polygonLatLngs(feature), {
+                    color: stroke,
+                    opacity: strokeOpacity,
+                    fillColor: fill,
+                    fillOpacity: fillOpacity,
+                    weight: strokeWidth
+                });
+                bindTerrainMapClick(polygon, id);
+                selectedLayer.addLayer(polygon);
+                applyTerrainFading();
+                if (options.fit !== false) {
+                    map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+                }
+
+                highlightListItem(id, options);
+            }
+
+            function bindListItemHandlers() {
+                document.querySelectorAll('.terrain-select').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        const item = btn.closest('.terrain-item');
+                        if (item) showTerenOnMap(item.dataset.id);
+                    });
+                });
             }
 
             function sortFeatures(features, sortBy) {
@@ -282,9 +568,11 @@
                 return features.filter(function (f) {
                     const id = terrainFeatureId(f);
                     const label = terrainLabel(f);
+                    const desc = terrainDescription(f);
                     return (
                         String(label).toLowerCase().indexOf(q) !== -1 ||
-                        String(id).toLowerCase().indexOf(q) !== -1
+                        String(id).toLowerCase().indexOf(q) !== -1 ||
+                        String(desc).toLowerCase().indexOf(q) !== -1
                     );
                 });
             }
@@ -301,14 +589,20 @@
                         const f = sorted[i];
                         const id = terrainFeatureId(f);
                         const label = terrainLabel(f);
+                        const selected = selectedTerrainId === String(id) ? ' selected' : '';
                         html +=
-                            '<li><a href="teren.html?id=' +
-                            encodeURIComponent(id) +
-                            '">' +
+                            '<li class="terrain-item' + selected + '" data-id="' + escapeHtml(String(id)) + '">' +
+                            '<button type="button" class="terrain-select">' +
                             escapeHtml(label) +
                             '<span class="tid">ID: ' +
                             escapeHtml(String(id)) +
-                            '</span></a></li>';
+                            '</span></button>' +
+                            '<a class="terrain-open" href="teren.html?id=' +
+                            encodeURIComponent(id) +
+                            '" target="_blank" rel="noopener noreferrer" ' +
+                            'title="Otwórz w nowej zakładce" aria-label="Otwórz teren w nowej zakładce">' +
+                            openTabIcon +
+                            '</a></li>';
                     }
                 }
                 return html;
@@ -336,16 +630,32 @@
                 const sorted = sortFeatures(filtered, sortBy);
 
                 listEl.innerHTML = renderListItems(sorted, query);
+                bindListItemHandlers();
+                renderTerrainsOnMap(sorted, !selectedTerrainId);
+                if (selectedTerrainId) {
+                    if (featureById[selectedTerrainId]) {
+                        showTerenOnMap(selectedTerrainId, { fit: false, scroll: false });
+                    } else {
+                        selectedTerrainId = null;
+                        selectedLayer.clearLayers();
+                        applyTerrainFading();
+                    }
+                }
                 updateCount(allFeatures.length, sorted.length, query);
             }
 
             function initTerrainBrowse(allFeatures) {
+                document.getElementById('browse-layout').hidden = false;
+                document.getElementById('map').hidden = false;
+                initMap();
+                renderTerrainsOnMap(allFeatures, true);
+
                 const root = document.getElementById('browse-root');
                 root.innerHTML =
                     '<div class="browse-inner">' +
                     '<div class="browse-toolbar">' +
                     '<input type="search" class="browse-search" id="terrain-search" ' +
-                    'placeholder="Szukaj po nazwie lub ID…" autocomplete="off">' +
+                    'placeholder="Szukaj po nazwie, ID lub opisie…" autocomplete="off">' +
                     '<div class="browse-sort">' +
                     '<span class="browse-sort-label">Sortuj:</span>' +
                     '<select id="terrain-sort" aria-label="Sortowanie listy">' +
@@ -363,6 +673,14 @@
                 });
 
                 applyFilters(allFeatures);
+
+                setTimeout(function () {
+                    map.invalidateSize();
+                }, 0);
+
+                window.addEventListener('resize', function () {
+                    if (map) map.invalidateSize();
+                });
             }
 
             fetch('tereny.geojson?t=' + Date.now())
@@ -383,9 +701,11 @@
                     });
 
                     document.getElementById('subtitle').textContent =
-                        'Wybierz teren, aby zobaczyć mapę i nawigację';
+                        'Kliknij teren na liście, aby zobaczyć go na mapie';
 
                     if (!features.length) {
+                        document.getElementById('browse-layout').hidden = false;
+                        document.getElementById('map').hidden = true;
                         document.getElementById('browse-root').innerHTML =
                             '<div class="browse-inner">' +
                             '<p class="browse-count">Brak zdefiniowanych terenów w pliku geojson.</p>' +
