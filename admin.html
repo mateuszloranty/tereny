@@ -745,9 +745,24 @@
             const CONFIG = {
                 DB_FILENAME: 'tereny.geojson',
                 COORD_PRECISION: 5,
+                FETCH_TIMEOUT_MS: 45000,
                 // URL wdrożenia Apps Script (drive-sync.gs) — zapis live na Google Drive
-                DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbxYZ_0_9WA3wZBRgXKIc-1UdILEgoQIyVueTZSzamKcnUsyvHACBfXUr8rIRPA81ZR6/exec'
+                DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbx71dBNiRdlN9sgmtuAY6xz2fDuIFYY6NGlTkhzVE4F2ERd6y3w2ljf6p-_Rwk3SvsO/exec'
             };
+
+            async function fetchWithTimeout(url, ms) {
+                const ctrl = new AbortController();
+                const timer = setTimeout(function () { ctrl.abort(); }, ms || CONFIG.FETCH_TIMEOUT_MS);
+                try {
+                    const res = await fetch(url, { signal: ctrl.signal });
+                    clearTimeout(timer);
+                    return res;
+                } catch (e) {
+                    clearTimeout(timer);
+                    if (e.name === 'AbortError') throw new Error('Przekroczono limit czasu połączenia');
+                    throw e;
+                }
+            }
 
             const currentUrl = window.location.href;
             const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
@@ -860,7 +875,9 @@
                 try {
                     if (fromDrive) {
                         try {
-                            const res = await fetch(CONFIG.DRIVE_SYNC_URL + '?t=' + Date.now());
+                            const res = await fetchWithTimeout(
+                                CONFIG.DRIVE_SYNC_URL + '?resource=tereny&t=' + Date.now()
+                            );
                             if (res.ok) {
                                 database = await res.json();
                                 saveToLocalStorage();
@@ -952,7 +969,9 @@
                 }
 
                 try {
-                    const res = await fetch(CONFIG.DRIVE_SYNC_URL + '?t=' + Date.now());
+                    const res = await fetchWithTimeout(
+                        CONFIG.DRIVE_SYNC_URL + '?resource=tereny&t=' + Date.now()
+                    );
                     if (!res.ok) throw new Error('Status ' + res.status);
                     database = await res.json();
                     saveToLocalStorage();
