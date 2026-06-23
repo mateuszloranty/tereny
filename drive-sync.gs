@@ -2,14 +2,14 @@
  * Google Apps Script — synchronizacja tereny.geojson + arkusz Google Sheets
  *
  * 1. Utwórz plik tereny.geojson na Google Drive.
- * 2. Utwórz arkusz z zakładkami: bracia, tereny, grupa 1, grupa 2, Opracowanie 1-20, …
+ * 2. Utwórz arkusz z zakładkami: Bracia, Tereny, Grupa 1, Grupa 2, Opracowanie 1-20, …
  * 3. Wklej FILE_ID i SPREADSHEET_ID poniżej.
  * 4. Wdróż jako aplikacja internetowa (wykonuj jako: Ja, dostęp: Każdy).
  * 5. URL wdrożenia → CONFIG.DRIVE_SYNC_URL w admin.html i servant.html
  */
 
 var FILE_ID = '1mI6SMecuweOvA1xED0jQKwYcIwM11wgn';
-var SPREADSHEET_ID = '1DI8B5w5tvOSb_IMUdVI_edbtOHOxj6ie4hARlv1unbo';
+var SPREADSHEET_ID = '1FBZwO6xrmwEvIy8VUhe9dTQfBb6K45XeVBUHo4WYmjo';
 
 var SHEET = {
   bracia: 'Bracia',
@@ -39,7 +39,10 @@ function doGet(e) {
   if (resource === 'grupa') return jsonOut_(readGrupa_(p.id));
   if (resource === 'tereny-meta') return jsonOut_(readTerenyMeta_());
   if (resource === 'opracowanie') return jsonOut_(readOpracowanie_(p.range));
-  if (resource === 'bundle') return jsonOut_(getBundle_());
+  if (resource === 'bundle') {
+    var light = p.light === '1' || p.light === 'true';
+    return jsonOut_(getBundle_(light));
+  }
   return jsonOut_({ error: 'Nieznany resource: ' + resource });
   } catch (err) {
     return jsonOut_({ error: String(err.message || err) });
@@ -80,6 +83,9 @@ function doPost(e) {
     if (body.action === 'zdaj') {
       return jsonOut_(actionZdaj_(body));
     }
+    if (body.action === 'import-tereny') {
+      return jsonOut_(importTerenyMetaFromGeoJson_(body));
+    }
 
     // Legacy: raw GeoJSON POST (admin.html)
     if (!body.resource && !body.action) {
@@ -112,24 +118,40 @@ function saveTerenyGeoJson_(data) {
 
 // ── Bundle ──────────────────────────────────────────────────────────────────
 
-function getBundle_() {
-  var bundle = {
-    tereny: getTerenyGeoJson_(),
-    bracia: readBracia_(),
-    grupy: detectGrupy_(),
-    terenyMeta: readTerenyMeta_(),
-    opracowanie: {}
-  };
-  var ranges = detectOpracowanieRanges_();
-  for (var i = 0; i < ranges.length; i++) {
-    bundle.opracowanie[ranges[i]] = readOpracowanie_(ranges[i]);
+function safeRead_(fn, fallback) {
+  try {
+    return fn();
+  } catch (e) {
+    return fallback;
   }
-  var grupaData = {};
+}
+
+function getBundle_(light) {
+  var bundle = {
+    tereny: light ? null : safeRead_(getTerenyGeoJson_, null),
+    bracia: safeRead_(readBracia_, []),
+    grupy: safeRead_(detectGrupy_, []),
+    terenyMeta: safeRead_(readTerenyMeta_, []),
+    opracowanie: {},
+    grupaData: {}
+  };
+
+  if (!light) {
+    var ranges = safeRead_(detectOpracowanieRanges_, []);
+    for (var i = 0; i < ranges.length; i++) {
+      var range = ranges[i];
+      bundle.opracowanie[range] = safeRead_(function (r) {
+        return function () { return readOpracowanie_(r); };
+      }(range), []);
+    }
+  }
+
   for (var g = 0; g < bundle.grupy.length; g++) {
     var gid = bundle.grupy[g].id;
-    grupaData[gid] = readGrupa_(gid);
+    bundle.grupaData[gid] = safeRead_(function (id) {
+      return function () { return readGrupa_(id); };
+    }(gid), { id: String(gid), members: [], assignments: [] });
   }
-  bundle.grupaData = grupaData;
   return bundle;
 }
 
@@ -140,18 +162,51 @@ function ss_() {
 }
 
 function sheet_(name) {
-  var sh = ss_().getSheetByName(name);
+  var sh = findSheet_(name);
   if (!sh) throw new Error('Brak zakładki: ' + name);
   return sh;
 }
 
+/** Dopasowanie zakładki po nazwie (wielkość liter ignorowana). */
+function findSheet_(canonicalName) {
+  var sh = ss_().getSheetByName(canonicalName);
+  if (sh) return sh;
+  var want = String(canonicalName).toLowerCase();
+  var sheets = ss_().getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getName().toLowerCase() === want) return sheets[i];
+  }
+  return null;
+}
+
+/** Wszystkie zakładki zaczynające się od prefiksu (np. „Grupa ”, „Opracowanie ”). */
+function findSheetsByPrefix_(prefix) {
+  var want = String(prefix).toLowerCase();
+  var sheets = ss_().getSheets();
+  var out = [];
+  for (var i = 0; i < sheets.length; i++) {
+    var name = sheets[i].getName();
+    if (name.toLowerCase().indexOf(want) !== 0) continue;
+    out.push({
+      sheet: sheets[i],
+      name: name,
+      suffix: name.substring(want.length).trim()
+    });
+  }
+  return out;
+}
+
 function ensureSheet_(name, headers) {
-  var sh = ss_().getSheetByName(name);
+  var sh = findSheet_(name);
   if (!sh) {
     sh = ss_().insertSheet(name);
     if (headers && headers.length) sh.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
   return sh;
+}
+
+function getSheetOptional_(name) {
+  return findSheet_(name);
 }
 
 function normalizeHeader_(h) {
@@ -192,7 +247,8 @@ function parseTerenNum_(id) {
 // ── Bracia ──────────────────────────────────────────────────────────────────
 
 function readBracia_() {
-  var sh = ensureSheet_(SHEET.bracia, ['id', 'imie', 'nazwisko', 'grupa_id']);
+  var sh = getSheetOptional_(SHEET.bracia);
+  if (!sh) return [];
   var data = sh.getDataRange().getValues();
   if (data.length < 2) return [];
   var headers = data[0].map(String);
@@ -254,15 +310,10 @@ function syncGroupMembersFromBracia_(rows) {
 // ── Grupy ───────────────────────────────────────────────────────────────────
 
 function detectGrupy_() {
-  var sheets = ss_().getSheets();
+  var matches = findSheetsByPrefix_(SHEET.grupaPrefix);
   var out = [];
-  var prefix = SHEET.grupaPrefix.toLowerCase();
-  for (var i = 0; i < sheets.length; i++) {
-    var name = sheets[i].getName();
-    if (name.toLowerCase().indexOf(prefix) === 0) {
-      var id = name.substring(SHEET.grupaPrefix.length).trim();
-      out.push({ id: id, name: name });
-    }
+  for (var i = 0; i < matches.length; i++) {
+    out.push({ id: matches[i].suffix, name: matches[i].name });
   }
   out.sort(function (a, b) {
     var na = parseInt(a.id, 10);
@@ -278,8 +329,7 @@ function grupaSheetName_(id) {
 }
 
 function readGrupa_(id) {
-  var name = grupaSheetName_(id);
-  var sh = ss_().getSheetByName(name);
+  var sh = findSheet_(grupaSheetName_(id));
   if (!sh) return { id: String(id), members: [], assignments: [] };
 
   var data = sh.getDataRange().getValues();
@@ -348,10 +398,8 @@ function writeGrupa_(id, members, assignments) {
 // ── Tereny meta ─────────────────────────────────────────────────────────────
 
 function readTerenyMeta_() {
-  var sh = ensureSheet_(SHEET.tereny, [
-    'teren_nr', 'nazwa', 'parent_teren_nr', 'ostatnie_opracowanie',
-    'przypisany_typ', 'przypisany_id', 'data_przydzialu', 'opracowania_json'
-  ]);
+  var sh = getSheetOptional_(SHEET.tereny);
+  if (!sh) return [];
   var data = sh.getDataRange().getValues();
   if (data.length < 2) return [];
 
@@ -459,17 +507,148 @@ function defaultMeta_(terenId, nazwa) {
   };
 }
 
+// ── Import GeoJSON → arkusz Tereny ──────────────────────────────────────────
+
+function getFeatureIdFromGeo_(f) {
+  if (f.properties && f.properties.id) return String(f.properties.id);
+  if (f.id !== undefined && f.id !== null) return String(f.id);
+  return '';
+}
+
+function getFeatureTitleFromGeo_(f) {
+  var p = f.properties || {};
+  return String(p.title || p.name || '').trim();
+}
+
+function isSubterenFromGeo_(f) {
+  var p = f.properties || {};
+  return !!(p.isSubteren || p.parentId);
+}
+
+function sortTerenyMeta_(rows) {
+  rows.sort(function (a, b) {
+    var aId = String(a.teren_nr);
+    var bId = String(b.teren_nr);
+    var aM = aId.match(/^(\d+)(.*)/);
+    var bM = bId.match(/^(\d+)(.*)/);
+    if (aM && bM) {
+      var d = parseInt(aM[1], 10) - parseInt(bM[1], 10);
+      if (d !== 0) return d;
+      return aM[2].localeCompare(bM[2]);
+    }
+    return aId.localeCompare(bId);
+  });
+  return rows;
+}
+
+/**
+ * Scal tereny.geojson z zakładką Tereny.
+ * Zachowuje istniejące przydziały i daty; aktualizuje nazwę i parent_teren_nr z GeoJSON.
+ * Uruchom z edytora Apps Script: importTerenyFromGeoJson()
+ */
+function importTerenyFromGeoJson() {
+  var result = importTerenyMetaFromGeoJson_({ ensureOpracowanie: true });
+  Logger.log(JSON.stringify(result));
+  return result;
+}
+
+function importTerenyMetaFromGeoJson_(options) {
+  options = options || {};
+  var geo = getTerenyGeoJson_();
+  var features = geo.features || [];
+  var existing = readTerenyMeta_();
+  var byId = {};
+
+  for (var i = 0; i < existing.length; i++) {
+    byId[String(existing[i].teren_nr)] = existing[i];
+  }
+
+  var added = 0;
+  var updated = 0;
+
+  for (var f = 0; f < features.length; f++) {
+    var feat = features[f];
+    var id = getFeatureIdFromGeo_(feat);
+    if (!id) continue;
+
+    var p = feat.properties || {};
+    var nazwa = getFeatureTitleFromGeo_(feat);
+    var parent = p.parentId ? String(p.parentId) : '';
+
+    if (byId[id]) {
+      byId[id].nazwa = nazwa;
+      byId[id].parent_teren_nr = parent;
+      updated++;
+    } else {
+      byId[id] = defaultMeta_(id, nazwa);
+      byId[id].parent_teren_nr = parent;
+      added++;
+    }
+  }
+
+  var merged = [];
+  Object.keys(byId).forEach(function (k) { merged.push(byId[k]); });
+  sortTerenyMeta_(merged);
+  writeTerenyMeta_(merged);
+
+  var opracowanieEnsured = 0;
+  if (options.ensureOpracowanie !== false) {
+    opracowanieEnsured = ensureOpracowanieSheetsFromGeo_(features);
+  }
+
+  return {
+    ok: true,
+    added: added,
+    updated: updated,
+    total: merged.length,
+    opracowanieEnsured: opracowanieEnsured
+  };
+}
+
+function ensureOpracowanieSheetsFromGeo_(features) {
+  var nums = {};
+  for (var i = 0; i < features.length; i++) {
+    if (isSubterenFromGeo_(features[i])) continue;
+    var id = getFeatureIdFromGeo_(features[i]);
+    var num = parseTerenNum_(id);
+    if (!isNaN(num)) nums[num] = true;
+  }
+
+  var numList = Object.keys(nums).map(function (n) { return parseInt(n, 10); }).sort(function (a, b) { return a - b; });
+  if (!numList.length) return 0;
+
+  var maxNum = numList[numList.length - 1];
+  var ensured = 0;
+
+  for (var start = 1; start <= maxNum; start += OPRACOWANIE_CHUNK) {
+    var end = start + OPRACOWANIE_CHUNK - 1;
+    var range = start + '-' + end;
+    var sh = findSheet_(opracowanieSheetName_(range));
+    if (!sh) {
+      ensureOpracowanieSheet_(range, start, end);
+      ensured++;
+      continue;
+    }
+    for (var t = start; t <= end; t++) {
+      if (!nums[t]) continue;
+      var row = terenRowInOpracowanie_(t, start);
+      var val = sh.getRange(row, 1).getValue();
+      if (!val && val !== 0) {
+        sh.getRange(row, 1).setValue(t);
+        ensured++;
+      }
+    }
+  }
+  return ensured;
+}
+
 // ── Opracowanie sheets ──────────────────────────────────────────────────────
 
 function detectOpracowanieRanges_() {
-  var sheets = ss_().getSheets();
+  var matches = findSheetsByPrefix_(SHEET.opracowaniePrefix);
   var out = [];
-  var prefix = SHEET.opracowaniePrefix.toLowerCase();
-  for (var i = 0; i < sheets.length; i++) {
-    var name = sheets[i].getName();
-    if (name.toLowerCase().indexOf(prefix) !== 0) continue;
-    var rest = name.substring(SHEET.opracowaniePrefix.length).trim();
-    var m = rest.match(/(\d+)\s*[-–]\s*(\d+)/);
+  for (var i = 0; i < matches.length; i++) {
+    var m = matches[i].suffix.match(/(\d+)\s*[-–]\s*(\d+)/);
     if (m) out.push(m[1] + '-' + m[2]);
   }
   out.sort(function (a, b) {
@@ -489,7 +668,7 @@ function findOpracowanieSheetForTeren_(terenNr) {
   var end = start + OPRACOWANIE_CHUNK - 1;
   var range = start + '-' + end;
   var name = opracowanieSheetName_(range);
-  var sh = ss_().getSheetByName(name);
+  var sh = findSheet_(name);
   if (!sh) {
     sh = ensureOpracowanieSheet_(range, start, end);
   }
@@ -498,7 +677,7 @@ function findOpracowanieSheetForTeren_(terenNr) {
 
 function ensureOpracowanieSheet_(range, start, end) {
   var name = opracowanieSheetName_(range);
-  var sh = ss_().getSheetByName(name);
+  var sh = findSheet_(name);
   if (!sh) sh = ss_().insertSheet(name);
 
   var header1 = ['Teren nr', 'Data ostatniego opracowania*'];
@@ -530,7 +709,7 @@ function terenRowInOpracowanie_(terenNr, start) {
 
 function readOpracowanie_(range) {
   if (!range) return [];
-  var sh = ss_().getSheetByName(opracowanieSheetName_(range));
+  var sh = findSheet_(opracowanieSheetName_(range));
   if (!sh) return [];
 
   var parts = String(range).split('-');

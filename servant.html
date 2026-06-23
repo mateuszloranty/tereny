@@ -147,6 +147,12 @@
                         <button class="color-mode-btn" data-mode="staleness" type="button">Aktualność</button>
                     </div>
                     <div class="legend" id="color-legend"></div>
+                    <button class="btn-secondary" id="btn-import-tereny" type="button" style="margin-bottom:10px">
+                        📥 Importuj tereny z GeoJSON do arkusza
+                    </button>
+                    <button class="btn-secondary" id="btn-export-tereny-csv" type="button" style="margin-bottom:10px">
+                        📋 Pobierz CSV (do ręcznego wklejenia)
+                    </button>
                     <p class="teren-count" id="teren-count">Tereny: 0</p>
                     <div class="teren-list" id="teren-list"></div>
                 </div>
@@ -224,7 +230,9 @@
     <script>
     (function () {
         const CONFIG = {
-            DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbxYZ_0_9WA3wZBRgXKIc-1UdILEgoQIyVueTZSzamKcnUsyvHACBfXUr8rIRPA81ZR6/exec',
+            DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbz293s8HFP61VyJ4JT5eGForyb04sArhzdgA1W3KC7EcXGzJKq_TWdL618atqk_a8bG/exec',
+            DB_FILENAME: 'tereny.geojson',
+            FETCH_TIMEOUT_MS: 45000,
             COORD_PRECISION: 5,
             COLORS: { red: '#e74c3c', yellow: '#f1c40f', orange: '#e67e22', green: '#27ae60', archived: '#95a5a6' }
         };
@@ -323,6 +331,62 @@
                 data_przydzialu: m.data_przydzialu || '',
                 completions: m.completions || []
             }));
+        }
+
+        async function importTerenyToSheet() {
+            if (!confirm('Zaimportować wszystkie tereny z tereny.geojson do zakładki Tereny w arkuszu?\n\nIstniejące przydziały i daty zostaną zachowane.')) return;
+
+            setSaving(true);
+            try {
+                const res = await apiPost({ action: 'import-tereny', ensureOpracowanie: true });
+                if (res.error) throw new Error(res.error);
+
+                const sheetBundle = await apiGet('bundle', { light: '1' });
+                if (!sheetBundle.error) {
+                    applySheetBundle(sheetBundle);
+                    syncMetaFromFeatures();
+                    saveBundleLocal();
+                }
+
+                updateSyncStatus('synced');
+                alert('✅ Import zakończony.\n\n' +
+                    'W arkuszu: ' + (res.total || 0) + ' terenów\n' +
+                    'Nowych: ' + (res.added || 0) + '\n' +
+                    'Zaktualizowanych nazw: ' + (res.updated || 0) +
+                    (res.opracowanieEnsured ? '\nWierszy w Opracowanie: ' + res.opracowanieEnsured : ''));
+                renderTerenList();
+                renderMap();
+            } catch (e) {
+                console.warn('Server import failed, local fallback:', e);
+                syncMetaFromFeatures();
+                const ok = await saveTerenyMeta();
+                if (ok) {
+                    alert('✅ Zapisano tereny do arkusza (tryb lokalny).\nWdróż ponownie drive-sync.gs, aby używać pełnego importu z arkuszami Opracowanie.');
+                } else {
+                    alert('❌ Import nie powiódł się: ' + e.message);
+                }
+            } finally {
+                setSaving(false);
+            }
+        }
+
+        function exportTerenyCsv() {
+            syncMetaFromFeatures();
+            const rows = buildTerenyMetaArray();
+            const header = ['teren_nr', 'nazwa', 'parent_teren_nr', 'ostatnie_opracowanie', 'przypisany_typ', 'przypisany_id', 'data_przydzialu'];
+            const lines = [header.join('\t')];
+            rows.forEach(m => {
+                lines.push([
+                    m.teren_nr, m.nazwa, m.parent_teren_nr, m.ostatnie_opracowanie,
+                    m.przypisany_typ, m.przypisany_id, m.data_przydzialu
+                ].join('\t'));
+            });
+            const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/tab-separated-values;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'tereny-import.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
         }
 
         function assigneeLabel(meta) {
@@ -427,12 +491,86 @@
             } catch (e) { return false; }
         }
 
+        async function fetchWithTimeout(url, ms) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), ms || CONFIG.FETCH_TIMEOUT_MS);
+            try {
+                const res = await fetch(url, { signal: ctrl.signal });
+                clearTimeout(timer);
+                return res;
+            } catch (e) {
+                clearTimeout(timer);
+                if (e.name === 'AbortError') throw new Error('Przekroczono limit czasu połączenia');
+                throw e;
+            }
+        }
+
         async function apiGet(resource, extra) {
             let url = CONFIG.DRIVE_SYNC_URL + '?resource=' + encodeURIComponent(resource) + '&t=' + Date.now();
             if (extra) Object.keys(extra).forEach(k => { url += '&' + k + '=' + encodeURIComponent(extra[k]); });
-            const res = await fetch(url);
+            const res = await fetchWithTimeout(url);
             if (!res.ok) throw new Error('GET ' + resource + ' status ' + res.status);
             return res.json();
+        }
+
+        async function loadTerenyGeoJson() {
+            if (window.location.protocol !== 'file:') {
+                try {
+                    const res = await fetch(CONFIG.DB_FILENAME + '?t=' + Date.now());
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data?.features?.length) return data;
+                    }
+                } catch (e) {
+                    console.warn('Local tereny.geojson failed:', e);
+                }
+            }
+            if (CONFIG.DRIVE_SYNC_URL) {
+                try {
+                    const res = await fetchWithTimeout(
+                        CONFIG.DRIVE_SYNC_URL + '?resource=tereny&t=' + Date.now()
+                    );
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data?.features) return data;
+                        if (data?.error) throw new Error(data.error);
+                    }
+                } catch (e) {
+                    console.warn('Drive tereny load failed:', e);
+                }
+            }
+            throw new Error('Nie udało się wczytać tereny.geojson');
+        }
+
+        async function loadGrupaDataForGrupy(grupyList) {
+            const data = {};
+            for (const g of grupyList) {
+                try {
+                    data[g.id] = await apiGet('grupa', { id: g.id });
+                } catch (e) {
+                    console.warn('grupa', g.id, e);
+                    data[g.id] = { id: String(g.id), members: [], assignments: [] };
+                }
+            }
+            return data;
+        }
+
+        async function loadSheetBundle() {
+            try {
+                const bundle = await apiGet('bundle', { light: '1' });
+                if (bundle.error) throw new Error(bundle.error);
+                return bundle;
+            } catch (e) {
+                console.warn('Light bundle failed, trying parts:', e);
+                const out = { bracia: [], grupy: [], terenyMeta: [], grupaData: {}, opracowanie: {} };
+                try { out.bracia = await apiGet('bracia'); } catch (err) { console.warn(err); }
+                try { out.terenyMeta = await apiGet('tereny-meta'); } catch (err) { console.warn(err); }
+                try { out.grupy = await apiGet('grupy'); } catch (err) { console.warn(err); }
+                if (out.grupy.length) {
+                    out.grupaData = await loadGrupaDataForGrupy(out.grupy);
+                }
+                return out;
+            }
         }
 
         async function apiPost(body) {
@@ -445,34 +583,42 @@
             return res.json();
         }
 
+        function applySheetBundle(bundle) {
+            bracia = bundle.bracia || [];
+            grupy = bundle.grupy || [];
+            grupaData = bundle.grupaData || {};
+            opracowanie = bundle.opracowanie || {};
+            terenyMeta = {};
+            (bundle.terenyMeta || []).forEach(m => { terenyMeta[String(m.teren_nr)] = m; });
+            Object.keys(terenyMeta).forEach(k => { metaById[k] = terenyMeta[k]; });
+        }
+
         async function loadBundle() {
-            setLoading(true);
-            updateSyncStatus('loading');
+            setLoading(true, 'Ładowanie terenów…');
+            updateSyncStatus('loading', '⏳ Ładowanie terenów…');
             try {
-                let bundle;
-                try {
-                    bundle = await apiGet('bundle');
-                    if (bundle.error) throw new Error(bundle.error);
-                } catch (e) {
-                    console.warn('Bundle failed, fallback:', e);
-                    const tereny = await apiGet('tereny');
-                    bundle = { tereny, bracia: [], grupy: [], terenyMeta: [], grupaData: {}, opracowanie: {} };
+                const terenyPromise = loadTerenyGeoJson();
+                const sheetsPromise = loadSheetBundle().catch(e => {
+                    console.warn('Sheets load failed:', e);
+                    return null;
+                });
+
+                database = await terenyPromise;
+                updateSyncStatus('loading', '⏳ Ładowanie arkusza…');
+
+                const sheetBundle = await sheetsPromise;
+                if (sheetBundle) {
+                    applySheetBundle(sheetBundle);
                 }
-                database = bundle.tereny || { type: 'FeatureCollection', features: [] };
-                bracia = bundle.bracia || [];
-                grupy = bundle.grupy || [];
-                grupaData = bundle.grupaData || {};
-                opracowanie = bundle.opracowanie || {};
-                terenyMeta = {};
-                (bundle.terenyMeta || []).forEach(m => { terenyMeta[String(m.teren_nr)] = m; });
-                Object.keys(terenyMeta).forEach(k => { metaById[k] = terenyMeta[k]; });
+
                 syncMetaFromFeatures();
                 saveBundleLocal();
                 updateSyncStatus('synced');
             } catch (e) {
+                console.error('loadBundle failed:', e);
                 if (loadBundleLocal()) {
                     syncMetaFromFeatures();
-                    updateSyncStatus('local', '⚠️ Offline — dane z pamięci');
+                    updateSyncStatus('local', '⚠️ Offline — dane z pamięci (' + e.message + ')');
                 } else {
                     updateSyncStatus('error', '❌ ' + e.message);
                 }
@@ -970,7 +1116,7 @@
         function renderGrupyList() {
             const list = document.getElementById('grupy-list');
             if (!grupy.length) {
-                list.innerHTML = '<p class="list-empty">Brak grup w arkuszu (zakładki „grupa 1”, „grupa 2”…)</p>';
+                list.innerHTML = '<p class="list-empty">Brak grup w arkuszu (zakładki „Grupa 1”, „Grupa 2”…)</p>';
                 return;
             }
             list.innerHTML = grupy.map(g => {
@@ -1098,6 +1244,8 @@
         document.getElementById('assign-confirm').onclick = confirmAssign;
         document.getElementById('assign-cancel').onclick = () => document.getElementById('assign-modal').classList.remove('open');
         document.getElementById('assign-date-clear').onclick = () => { document.getElementById('assign-date').value = ''; };
+        document.getElementById('btn-import-tereny').onclick = importTerenyToSheet;
+        document.getElementById('btn-export-tereny-csv').onclick = exportTerenyCsv;
 
         // ── Init ────────────────────────────────────────────────────────────
         loadBundle().then(() => {
@@ -1105,6 +1253,10 @@
             renderMap();
             initBottomSheet();
             expandSheet();
+        }).catch(e => {
+            console.error('Init failed:', e);
+            setLoading(false);
+            updateSyncStatus('error', '❌ ' + e.message);
         });
     })();
     </script>
