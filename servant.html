@@ -9,99 +9,651 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; overflow: hidden; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
-        .app { display: flex; flex-direction: column; height: 100dvh; position: relative; }
-        .map-wrap { flex: 1; min-height: 0; position: relative; }
-        #map { width: 100%; height: 100%; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100dvh;
+            position: relative;
+        }
+
+        .map-wrap {
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
         .panel-sheet {
-            position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
-            background: #fff; border-radius: 16px 16px 0 0;
-            box-shadow: 0 -4px 28px rgba(0,0,0,.18);
-            display: flex; flex-direction: column; max-height: 88dvh;
-            will-change: transform; touch-action: none;
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            background: #fff;
+            border-radius: 16px 16px 0 0;
+            box-shadow: 0 -4px 28px rgba(0, 0, 0, .18);
+            display: flex;
+            flex-direction: column;
+            max-height: 88dvh;
+            will-change: transform;
+            touch-action: none;
         }
-        .panel-sheet.is-dragging { transition: none; }
-        .panel-sheet:not(.is-dragging) { transition: transform .28s cubic-bezier(.32,.72,0,1); }
-        .sheet-handle { flex-shrink: 0; padding: 10px 16px 6px; cursor: grab; touch-action: none; user-select: none; }
-        .sheet-handle:active { cursor: grabbing; }
-        .sheet-handle-bar { width: 40px; height: 4px; background: #ccc; border-radius: 2px; margin: 0 auto 8px; }
-        .sheet-handle-title { text-align: center; font-size: 14px; font-weight: 600; color: #2c3e50; }
-        .sheet-body { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 0 16px 24px; min-height: 0; touch-action: pan-y; position: relative; }
-        .sync-status { font-size: 12px; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
-        .sync-status.synced { background: #d4edda; color: #155724; }
-        .sync-status.local { background: #fff3cd; color: #856404; }
-        .sync-status.loading { background: #e2e3e5; color: #383d41; }
-        .sync-status.error { background: #f8d7da; color: #721c24; }
-        .sync-status.saving { background: #cce5ff; color: #004085; }
-        .sheet-saving { display: none; position: absolute; inset: 0; z-index: 60; background: rgba(255,255,255,.82); align-items: center; justify-content: center; flex-direction: column; gap: 14px; pointer-events: all; }
-        .panel-sheet.is-saving .sheet-saving { display: flex; }
-        .panel-sheet.is-saving .sheet-body { overflow: hidden; }
-        .loading-spinner { width: 36px; height: 36px; border: 3px solid #e0e0e0; border-top-color: #3498db; border-radius: 50%; animation: spin .75s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .loading-overlay { position: fixed; inset: 0; z-index: 3000; background: rgba(240,242,245,.94); display: none; align-items: center; justify-content: center; }
-        .loading-overlay.visible { display: flex; }
-        .nav-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
-        .nav-tab { flex: 1; padding: 10px 6px; border: 2px solid #e0e0e0; background: #f8f9fa; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; color: #555; font-family: inherit; }
-        .nav-tab.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
-        .panel-view { display: none; }
-        .panel-view.active { display: block; }
-        .panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-        .panel-header h2 { flex: 1; font-size: 17px; font-weight: 600; color: #2c3e50; }
-        .btn-back { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: none; background: #ecf0f1; border-radius: 8px; cursor: pointer; color: #2c3e50; flex-shrink: 0; }
-        .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
-        .filter-bar select { flex: 1; min-width: 120px; padding: 8px 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 13px; font-family: inherit; }
-        .color-mode-toggle { display: flex; gap: 4px; width: 100%; }
-        .color-mode-btn { flex: 1; padding: 8px; border: 2px solid #ddd; background: #fff; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; }
-        .color-mode-btn.active { border-color: #3498db; background: #ebf5fb; color: #2980b9; }
-        .btn-primary { display: block; width: 100%; padding: 13px; background: #2c3e50; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
-        .btn-success { background: #27ae60; }
-        .btn-warning { background: #e67e22; }
-        .btn-secondary { display: block; width: 100%; padding: 11px; background: #ecf0f1; color: #2c3e50; border: 2px solid #bdc3c7; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 8px; }
-        .btn-row { display: flex; gap: 8px; margin-top: 12px; }
-        .btn-row .btn-primary, .btn-row .btn-secondary { flex: 1; margin-top: 0; }
-        .btn-sm { padding: 6px 10px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; font-family: inherit; font-weight: 600; }
-        label { display: block; margin: 10px 0 4px; font-weight: 600; font-size: 13px; color: #34495e; }
-        input[type="text"], input[type="date"], select.full { width: 100%; padding: 10px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; }
-        .date-row { display: flex; gap: 8px; align-items: center; }
-        .date-row input[type="date"] { flex: 1; }
-        .teren-count { font-size: 13px; color: #666; margin-bottom: 10px; }
-        .teren-list, .person-list, .group-list { display: flex; flex-direction: column; gap: 8px; }
-        .teren-item, .person-item, .group-item {
-            background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 10px;
-            padding: 12px; font-size: 14px; position: relative; cursor: pointer;
+
+        .panel-sheet.is-dragging {
+            transition: none;
         }
-        .teren-item.selected, .person-item.selected, .group-item.selected { border-color: #3498db; background: #ebf5fb; }
-        .teren-item.subteren { margin-left: 16px; border-left: 3px solid #95a5a6; }
-        .teren-item.archived { opacity: .45; }
-        .teren-color-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 6px; vertical-align: middle; }
-        .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #dfe6e9; color: #2c3e50; margin: 2px 4px 2px 0; }
-        .badge-group { background: #d6eaf8; color: #1a5276; }
-        .badge-brat { background: #fdebd0; color: #7d6608; }
-        .teren-meta { font-size: 12px; color: #666; margin-top: 4px; }
-        .teren-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-        .chip { display: inline-block; font-size: 11px; padding: 3px 8px; background: #e8f6f3; border-radius: 8px; margin: 2px; }
-        .list-empty { text-align: center; color: #999; font-size: 14px; padding: 20px 0; }
-        .teren-item-actions { position: absolute; top: 10px; right: 8px; display: flex; gap: 4px; }
-        .action-btn { width: 28px; height: 28px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1; }
-        .action-btn.edit { background: #ebf5fb; color: #2980b9; }
-        .action-btn.delete { background: #fdecea; color: #c0392b; }
-        .draw-banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 800; background: rgba(44,62,80,.92); color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; max-width: calc(100% - 32px); text-align: center; display: none; }
-        .draw-banner.visible { display: block; }
-        .modal { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; padding: 20px; }
-        .modal.open { display: flex; }
-        .modal-box { background: #fff; border-radius: 16px; padding: 20px; max-width: 400px; width: 100%; max-height: 90dvh; overflow-y: auto; }
-        .modal-box h3 { font-size: 16px; margin-bottom: 14px; color: #2c3e50; }
-        .legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; margin-bottom: 10px; }
-        .legend-item { display: flex; align-items: center; gap: 4px; }
-        .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+        .panel-sheet:not(.is-dragging) {
+            transition: transform .28s cubic-bezier(.32, .72, 0, 1);
+        }
+
+        .sheet-handle {
+            flex-shrink: 0;
+            padding: 10px 16px 6px;
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .sheet-handle:active {
+            cursor: grabbing;
+        }
+
+        .sheet-handle-bar {
+            width: 40px;
+            height: 4px;
+            background: #ccc;
+            border-radius: 2px;
+            margin: 0 auto 8px;
+        }
+
+        .sheet-handle-title {
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .sheet-body {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding: 0 16px 24px;
+            min-height: 0;
+            touch-action: pan-y;
+            position: relative;
+        }
+
+        .sync-status {
+            font-size: 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .sync-status.synced {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .sync-status.local {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .sync-status.loading {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .sync-status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .sync-status.saving {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .sheet-saving {
+            display: none;
+            position: absolute;
+            inset: 0;
+            z-index: 60;
+            background: rgba(255, 255, 255, .82);
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 14px;
+            pointer-events: all;
+        }
+
+        .panel-sheet.is-saving .sheet-saving {
+            display: flex;
+        }
+
+        .panel-sheet.is-saving .sheet-body {
+            overflow: hidden;
+        }
+
+        .loading-spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #3498db;
+            border-radius: 50%;
+            animation: spin .75s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            background: rgba(240, 242, 245, .94);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-overlay.visible {
+            display: flex;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 10px 6px;
+            border: 2px solid #e0e0e0;
+            background: #f8f9fa;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #555;
+            font-family: inherit;
+        }
+
+        .nav-tab.active {
+            background: #2c3e50;
+            color: #fff;
+            border-color: #2c3e50;
+        }
+
+        .panel-view {
+            display: none;
+        }
+
+        .panel-view.active {
+            display: block;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .panel-header h2 {
+            flex: 1;
+            font-size: 17px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .btn-back {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: #ecf0f1;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #2c3e50;
+            flex-shrink: 0;
+        }
+
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        .filter-bar select {
+            flex: 1;
+            min-width: 120px;
+            padding: 8px 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        .color-mode-toggle {
+            display: flex;
+            gap: 4px;
+            width: 100%;
+            margin-bottom: 14px;
+        }
+
+        .color-mode-btn {
+            flex: 1;
+            padding: 8px;
+            border: 2px solid #ddd;
+            background: #fff;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .color-mode-btn.active {
+            border-color: #3498db;
+            background: #ebf5fb;
+            color: #2980b9;
+        }
+
+        .btn-primary {
+            display: block;
+            width: 100%;
+            padding: 13px;
+            background: #2c3e50;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-warning {
+            background: #e67e22;
+        }
+
+        .btn-secondary {
+            display: block;
+            width: 100%;
+            padding: 11px;
+            background: #ecf0f1;
+            color: #2c3e50;
+            border: 2px solid #bdc3c7;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            margin-top: 8px;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .btn-row .btn-primary,
+        .btn-row .btn-secondary {
+            flex: 1;
+            margin-top: 0;
+        }
+
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 12px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+        }
+
+        label {
+            display: block;
+            margin: 10px 0 4px;
+            font-weight: 600;
+            font-size: 13px;
+            color: #34495e;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        select.full {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .date-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .date-row input[type="date"] {
+            flex: 1;
+        }
+
+        .teren-count {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .teren-list,
+        .person-list,
+        .group-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .teren-item,
+        .person-item,
+        .group-item {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 14px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .teren-item.selected,
+        .person-item.selected,
+        .group-item.selected {
+            border-color: #3498db;
+            background: #ebf5fb;
+        }
+
+        .brat-teren-block {
+            margin-bottom: 14px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .brat-teren-link {
+            color: #2980b9;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .brat-teren-link:hover {
+            text-decoration: underline;
+        }
+
+        .teren-item.subteren {
+            margin-left: 16px;
+            border-left: 3px solid #95a5a6;
+        }
+
+        .teren-item.archived {
+            opacity: .45;
+        }
+
+        .teren-item.map-hidden {
+            opacity: .42;
+            filter: grayscale(0.4);
+            background: #f0f0f0;
+        }
+
+        .teren-item.map-hidden strong {
+            color: #7f8c8d;
+        }
+
+        .action-btn.hide {
+            background: #ecf0f1;
+            color: #566573;
+        }
+
+        .action-btn.hide.is-hidden {
+            background: #d5dbdb;
+            color: #2c3e50;
+        }
+
+        .teren-color-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: #dfe6e9;
+            color: #2c3e50;
+            margin: 2px 4px 2px 0;
+        }
+
+        .badge-group {
+            background: #d6eaf8;
+            color: #1a5276;
+        }
+
+        .badge-brat {
+            background: #fdebd0;
+            color: #7d6608;
+        }
+
+        .teren-meta {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .teren-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        .chip {
+            display: inline-block;
+            font-size: 11px;
+            padding: 3px 8px;
+            background: #e8f6f3;
+            border-radius: 8px;
+            margin: 2px;
+        }
+
+        .list-empty {
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+            padding: 20px 0;
+        }
+
+        .teren-item-actions {
+            position: absolute;
+            top: 10px;
+            right: 8px;
+            display: flex;
+            gap: 4px;
+        }
+
+        .action-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            line-height: 1;
+        }
+
+        .action-btn.edit {
+            background: #ebf5fb;
+            color: #2980b9;
+        }
+
+        .action-btn.delete {
+            background: #fdecea;
+            color: #c0392b;
+        }
+
+        .draw-banner {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1200;
+            background: rgba(44, 62, 80, .92);
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            max-width: calc(100% - 32px);
+            text-align: center;
+            display: none;
+        }
+
+        .draw-banner.visible {
+            display: block;
+        }
+
+        .leaflet-top.leaflet-left,
+        .leaflet-top.leaflet-right {
+            z-index: 1200;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            background: rgba(0, 0, 0, .5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.open {
+            display: flex;
+        }
+
+        .modal-box {
+            background: #fff;
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 400px;
+            width: 100%;
+            max-height: 90dvh;
+            overflow-y: auto;
+        }
+
+        .modal-box h3 {
+            font-size: 16px;
+            margin-bottom: 14px;
+            color: #2c3e50;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 12px;
+            font-size: 11px;
+            margin-top: 4px;
+            margin-bottom: 16px;
+            padding-top: 12px;
+            border-top: 1px solid #e8ecef;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
         @media (min-width: 768px) {
-            .app { flex-direction: row; }
-            .map-wrap { flex: 1; }
-            .panel-sheet { position: static; transform: none !important; width: 440px; max-width: 44vw; max-height: none; height: 100%; border-radius: 0; box-shadow: none; border-left: 2px solid #e0e0e0; flex-shrink: 0; }
-            .sheet-handle { display: none; }
-            .sheet-body { padding: 16px 20px 28px; }
+            .app {
+                flex-direction: row;
+            }
+
+            .map-wrap {
+                flex: 1;
+            }
+
+            .panel-sheet {
+                position: static;
+                transform: none !important;
+                width: 440px;
+                max-width: 44vw;
+                max-height: none;
+                height: 100%;
+                border-radius: 0;
+                box-shadow: none;
+                border-left: 2px solid #e0e0e0;
+                flex-shrink: 0;
+            }
+
+            .sheet-handle {
+                display: none;
+            }
+
+            .sheet-body {
+                padding: 16px 20px 28px;
+            }
         }
     </style>
 </head>
@@ -126,7 +678,10 @@
                 <div class="sheet-handle-title" id="sheet-handle-title">Służba terenowa</div>
             </div>
             <div class="sheet-body">
-                <div class="sheet-saving"><div class="loading-spinner"></div><p>Zapisuję…</p></div>
+                <div class="sheet-saving">
+                    <div class="loading-spinner"></div>
+                    <p>Zapisuję…</p>
+                </div>
                 <div id="sync-status" class="sync-status loading">⏳ Ładowanie…</div>
 
                 <div class="nav-tabs">
@@ -137,7 +692,9 @@
 
                 <!-- TERENY -->
                 <div class="panel-view active" id="view-tereny">
-                    <div class="panel-header"><h2>📋 Tereny</h2></div>
+                    <div class="panel-header">
+                        <h2>📋 Tereny</h2>
+                    </div>
                     <div class="filter-bar">
                         <select id="filter-type">
                             <option value="">Wszystkie tereny</option>
@@ -147,16 +704,11 @@
                         <select id="filter-value" style="display:none"></select>
                     </div>
                     <div class="color-mode-toggle">
-                        <button class="color-mode-btn active" data-mode="status" type="button">Status przydziału</button>
+                        <button class="color-mode-btn active" data-mode="status" type="button">Status
+                            przydziału</button>
                         <button class="color-mode-btn" data-mode="staleness" type="button">Aktualność</button>
                     </div>
                     <div class="legend" id="color-legend"></div>
-                    <button class="btn-secondary" id="btn-import-tereny" type="button" style="margin-bottom:10px">
-                        📥 Importuj tereny z GeoJSON do arkusza
-                    </button>
-                    <button class="btn-secondary" id="btn-export-tereny-csv" type="button" style="margin-bottom:10px">
-                        📋 Pobierz CSV (do ręcznego wklejenia)
-                    </button>
                     <button class="btn-primary btn-success" id="btn-add-teren" type="button" style="margin-bottom:10px">
                         ➕ Dodaj teren
                     </button>
@@ -166,14 +718,27 @@
 
                 <!-- BRACIA -->
                 <div class="panel-view" id="view-bracia">
-                    <div class="panel-header"><h2>👥 Bracia</h2></div>
+                    <div class="panel-header">
+                        <h2>👥 Bracia</h2>
+                    </div>
                     <button class="btn-primary btn-success" id="btn-add-brat" type="button">➕ Dodaj brata</button>
                     <div class="person-list" id="bracia-list" style="margin-top:12px"></div>
                 </div>
 
+                <!-- DETAL BRATA -->
+                <div class="panel-view" id="view-brat-detail">
+                    <div class="panel-header">
+                        <button class="btn-back" id="btn-back-bracia" type="button" aria-label="Wróć">←</button>
+                        <h2 id="brat-detail-title">Brat</h2>
+                    </div>
+                    <div id="brat-detail-body"></div>
+                </div>
+
                 <!-- GRUPY -->
                 <div class="panel-view" id="view-grupy">
-                    <div class="panel-header"><h2>🏷️ Grupy</h2></div>
+                    <div class="panel-header">
+                        <h2>🏷️ Grupy</h2>
+                    </div>
                     <p style="font-size:12px;color:#666;margin-bottom:10px;line-height:1.45">
                         Każda grupa to osobna zakładka w tym samym arkuszu Google Sheets (jak „Grupa 1”).
                     </p>
@@ -197,15 +762,39 @@
                         <button class="btn-back" id="btn-back-editor" type="button" aria-label="Wróć">←</button>
                         <h2 id="teren-editor-title">Teren</h2>
                     </div>
-                    <p style="font-size:13px;color:#666;margin-bottom:12px">Narysuj lub edytuj granice terenu na mapie (narzędzia po lewej).</p>
+                    <p style="font-size:13px;color:#666;margin-bottom:12px;line-height:1.45">
+                        Uzupełnij dane, potem narysuj granice na mapie.
+                    </p>
                     <label for="teren-editor-id">Numer terenu</label>
                     <input type="text" id="teren-editor-id" placeholder="np. 42">
                     <label for="teren-editor-name">Nazwa</label>
                     <input type="text" id="teren-editor-name" placeholder="Nazwa terenu">
+                    <label for="teren-editor-desc">Opis terenu</label>
+                    <input type="text" id="teren-editor-desc" placeholder="np. Centralna 1–20">
+                    <button class="btn-secondary" id="btn-go-teren-draw" type="button" style="margin-top:14px">
+                        ✏️ Rysuj granice na mapie
+                    </button>
+                    <p id="teren-polygon-status" style="font-size:12px;color:#666;margin-top:8px"></p>
                     <div class="btn-row">
-                        <button class="btn-primary btn-success" id="btn-save-teren" type="button">💾 Zapisz teren</button>
-                        <button class="btn-secondary" id="btn-clear-teren-draw" type="button">Wyczyść</button>
+                        <button class="btn-primary btn-success" id="btn-save-teren" type="button">💾 Zapisz
+                            teren</button>
                     </div>
+                </div>
+
+                <!-- RYSOWANIE GRANIC TERENU -->
+                <div class="panel-view" id="view-teren-draw">
+                    <div class="panel-header">
+                        <button class="btn-back" id="btn-back-teren-draw" type="button" aria-label="Wróć">←</button>
+                        <h2>Granice terenu</h2>
+                    </div>
+                    <p style="font-size:13px;color:#666;margin-bottom:12px;line-height:1.5">
+                        Kliknij ikonę <strong>wielokąta</strong> u góry mapy (lewy górny róg), zaznacz wierzchołki
+                        i zamknij klikając pierwszy punkt. Możesz też edytować istniejące granice.
+                    </p>
+                    <button class="btn-secondary" id="btn-clear-teren-polygon" type="button">🗑️ Wyczyść wielokąt</button>
+                    <button class="btn-primary btn-success" id="btn-finish-teren-draw" type="button" style="margin-top:10px">
+                        ✓ Gotowe — wróć do formularza
+                    </button>
                 </div>
 
                 <!-- RYSOWANIE SUBTERENU -->
@@ -214,13 +803,15 @@
                         <button class="btn-back" id="btn-back-detail" type="button">←</button>
                         <h2>Subteren</h2>
                     </div>
-                    <p style="font-size:13px;color:#666;margin-bottom:12px">Narysuj polygon wewnątrz terenu nadrzędnego.</p>
+                    <p style="font-size:13px;color:#666;margin-bottom:12px">Narysuj polygon wewnątrz terenu nadrzędnego.
+                    </p>
                     <label for="subteren-id">ID subterenu</label>
                     <input type="text" id="subteren-id" placeholder="np. 5a">
                     <label for="subteren-name">Nazwa</label>
                     <input type="text" id="subteren-name" placeholder="Część terenu">
                     <div class="btn-row">
-                        <button class="btn-primary btn-success" id="btn-save-subteren" type="button">💾 Zapisz subteren</button>
+                        <button class="btn-primary btn-success" id="btn-save-subteren" type="button">💾 Zapisz
+                            subteren</button>
                         <button class="btn-secondary" id="btn-clear-draw" type="button">Wyczyść</button>
                     </div>
                 </div>
@@ -258,9 +849,13 @@
         <div class="modal-box">
             <h3>Usuń przydział</h3>
             <p id="unassign-modal-text" style="font-size:14px;color:#444;margin-bottom:14px;line-height:1.45"></p>
-            <p style="font-size:12px;color:#666;margin-bottom:12px">Co zrobić z opracowaniami zapisanymi w tym przydziale?</p>
-            <button class="btn-primary btn-success" id="unassign-keep-history" type="button" style="margin-bottom:8px">Usuń przydział, zostaw opracowania</button>
-            <button class="btn-secondary" id="unassign-clear-history" type="button" style="margin-bottom:8px;background:#fdecea;color:#c0392b;border-color:#f5b7b1">Usuń przydział i opracowania</button>
+            <p style="font-size:12px;color:#666;margin-bottom:12px">Co zrobić z opracowaniami zapisanymi w tym
+                przydziale?</p>
+            <button class="btn-primary btn-success" id="unassign-keep-history" type="button"
+                style="margin-bottom:8px">Usuń przydział, zostaw opracowania</button>
+            <button class="btn-secondary" id="unassign-clear-history" type="button"
+                style="margin-bottom:8px;background:#fdecea;color:#c0392b;border-color:#f5b7b1">Usuń przydział i
+                opracowania</button>
             <button class="btn-secondary" id="unassign-cancel" type="button">Anuluj</button>
         </div>
     </div>
@@ -284,1425 +879,1607 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
     <script>
-    (function () {
-        const CONFIG = {
-            DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbzlC4onV5OTZZbVqR3ak8w-Ggx49BXO3yj8jePOZrNa1f4BpR3boVLKueCStImh_-hp/exec',
-            DB_FILENAME: 'tereny.geojson',
-            FETCH_TIMEOUT_MS: 45000,
-            COORD_PRECISION: 5,
-            COLORS: { red: '#e74c3c', yellow: '#f1c40f', orange: '#e67e22', green: '#27ae60', archived: '#95a5a6' }
-        };
+        (function () {
+            const CONFIG = {
+                DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbx71dBNiRdlN9sgmtuAY6xz2fDuIFYY6NGlTkhzVE4F2ERd6y3w2ljf6p-_Rwk3SvsO/exec',
+                DB_FILENAME: 'tereny.geojson',
+                FETCH_TIMEOUT_MS: 45000,
+                COORD_PRECISION: 5,
+                COLORS: { red: '#e74c3c', yellow: '#f1c40f', orange: '#e67e22', green: '#27ae60', archived: '#95a5a6' }
+            };
 
-        let database = { type: 'FeatureCollection', features: [] };
-        let bracia = [];
-        let grupy = [];
-        let grupaData = {};
-        let terenyMeta = {};
-        let opracowanie = {};
+            let database = { type: 'FeatureCollection', features: [] };
+            let bracia = [];
+            let grupy = [];
+            let grupaData = {};
+            let terenyMeta = {};
+            let opracowanie = {};
 
-        let activeTab = 'tereny';
-        let panelView = 'tereny';
-        let colorMode = 'status';
-        let filterType = '';
-        let filterValue = '';
-        let selectedTerrainId = null;
-        let assignTerenId = null;
-        let unassignTerenId = null;
-        let drawParentId = null;
-        let editingTerenId = null;
-        let isCreatingNewTeren = false;
-        let currentPolygon = null;
-        let isSaving = false;
+            let activeTab = 'tereny';
+            let panelView = 'tereny';
+            let colorMode = 'status';
+            let filterType = '';
+            let filterValue = '';
+            let selectedTerrainId = null;
+            let assignTerenId = null;
+            let unassignTerenId = null;
+            let selectedBratId = null;
+            let drawParentId = null;
+            let editingTerenId = null;
+            let isCreatingNewTeren = false;
+            let drawContext = null;
+            let currentPolygon = null;
+            let isSaving = false;
 
-        const featureById = {};
-        const layerById = {};
-        const metaById = {};
-        const SHEET_COLLAPSED = 56;
-        let sheetExpanded = false;
-        let sheetHeight = 0;
-        let dragStartY = 0, dragStartTranslate = 0, isDragging = false, dragMoved = false;
+            const featureById = {};
+            const layerById = {};
+            const metaById = {};
+            const hiddenTereny = new Set();
+            const SHEET_COLLAPSED = 56;
+            let sheetExpanded = false;
+            let sheetHeight = 0;
+            let dragStartY = 0, dragStartTranslate = 0, isDragging = false, dragMoved = false;
 
-        const panelSheet = document.getElementById('panel-sheet');
-        const sheetHandle = document.getElementById('sheet-handle');
-        const syncStatusEl = document.getElementById('sync-status');
+            const panelSheet = document.getElementById('panel-sheet');
+            const sheetHandle = document.getElementById('sheet-handle');
+            const syncStatusEl = document.getElementById('sync-status');
 
-        // ── Utils ───────────────────────────────────────────────────────────
-        function todayISO() {
-            return new Date().toISOString().slice(0, 10);
-        }
-
-        function escapeHtml(s) {
-            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-        }
-
-        function getFeatureId(f) { return f.properties?.id ?? f.id ?? '?'; }
-        function getFeatureTitle(f) { const p = f.properties || {}; return p.title || p.name || 'Bez nazwy'; }
-        function isSubteren(f) { return !!(f.properties?.isSubteren || f.properties?.parentId); }
-        function isArchived(f) { return !!f.properties?.archived; }
-        function getParentId(f) { return f.properties?.parentId || ''; }
-
-        function sortFeatures() {
-            database.features.sort((a, b) => {
-                const aId = String(getFeatureId(a));
-                const bId = String(getFeatureId(b));
-                const aM = aId.match(/^(\d+)(.*)/);
-                const bM = bId.match(/^(\d+)(.*)/);
-                if (aM && bM) {
-                    const d = parseInt(aM[1],10) - parseInt(bM[1],10);
-                    return d !== 0 ? d : aM[2].localeCompare(bM[2]);
-                }
-                return aId.localeCompare(bId, 'pl', { numeric: true });
-            });
-        }
-
-        function bratLabel(b) { return (b.imie + ' ' + b.nazwisko).trim() || ('Brat ' + b.id); }
-
-        function grupaLabel(idOrName) {
-            const key = String(idOrName || '');
-            const g = grupy.find(x => String(x.id) === key || String(x.name) === key);
-            if (g) return g.name;
-            if (/^\d+$/.test(key)) {
-                const legacy = grupy.find(x => x.name === 'Grupa ' + key);
-                if (legacy) return legacy.name;
+            // ── Utils ───────────────────────────────────────────────────────────
+            function todayISO() {
+                return new Date().toISOString().slice(0, 10);
             }
-            return key || 'Grupa';
-        }
 
-        function normalizeGrupaId(idOrName) {
-            return grupaLabel(idOrName);
-        }
-
-        function suggestNextGrupaName() {
-            const nums = grupy.map(g => {
-                const m = String(g.name || g.id).match(/^Grupa\s+(\d+)$/i);
-                return m ? parseInt(m[1], 10) : 0;
-            }).filter(n => n > 0);
-            const next = nums.length ? Math.max(...nums) + 1 : 2;
-            return 'Grupa ' + next;
-        }
-
-        function getMeta(id) {
-            const key = String(id);
-            if (!metaById[key]) {
-                metaById[key] = terenyMeta[key] || {
-                    teren_nr: key, nazwa: '', parent_teren_nr: '', ostatnie_opracowanie: '',
-                    przypisany_typ: '', przypisany_id: '', data_przydzialu: '', completions: []
-                };
+            function escapeHtml(s) {
+                return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
             }
-            return metaById[key];
-        }
 
-        function syncMetaFromFeatures() {
-            database.features.forEach(f => {
-                const id = String(getFeatureId(f));
-                const m = getMeta(id);
-                m.teren_nr = id;
-                m.nazwa = getFeatureTitle(f);
-                if (f.properties?.parentId) m.parent_teren_nr = String(f.properties.parentId);
-                terenyMeta[id] = m;
-            });
-        }
+            function getFeatureId(f) { return f.properties?.id ?? f.id ?? '?'; }
+            function getFeatureTitle(f) { const p = f.properties || {}; return p.title || p.name || 'Bez nazwy'; }
+            function getFeatureDescription(f) { return f.properties?.description || ''; }
+            function isSubteren(f) { return !!(f.properties?.isSubteren || f.properties?.parentId); }
+            function isArchived(f) { return !!f.properties?.archived; }
+            function getParentId(f) { return f.properties?.parentId || ''; }
 
-        function buildTerenyMetaArray() {
-            return Object.values(metaById).map(m => ({
-                teren_nr: m.teren_nr,
-                nazwa: m.nazwa || '',
-                parent_teren_nr: m.parent_teren_nr || '',
-                ostatnie_opracowanie: m.ostatnie_opracowanie || '',
-                przypisany_typ: m.przypisany_typ || '',
-                przypisany_id: m.przypisany_id || '',
-                data_przydzialu: m.data_przydzialu || '',
-                completions: m.completions || []
-            }));
-        }
-
-        async function importTerenyToSheet() {
-            if (!confirm('Zaimportować wszystkie tereny z tereny.geojson do zakładki Tereny w arkuszu?\n\nIstniejące przydziały i daty zostaną zachowane.')) return;
-
-            setSaving(true, '⏳ Importuję tereny…');
-            try {
-                syncMetaFromFeatures();
-                await saveTerenyMeta({ skipUi: true });
-
-                const rows = buildTerenyMetaArray();
-
+            function loadHiddenTereny() {
                 try {
-                    const sheetBundle = await apiGet('bundle', { light: '1' });
-                    if (!sheetBundle.error) {
-                        applySheetBundle(sheetBundle);
-                        saveBundleLocal();
-                    }
-                } catch (e) { console.warn(e); }
+                    const s = localStorage.getItem('servantHiddenTereny');
+                    hiddenTereny.clear();
+                    if (!s) return;
+                    JSON.parse(s).forEach(id => hiddenTereny.add(String(id)));
+                } catch (e) {
+                    hiddenTereny.clear();
+                }
+            }
 
-                updateSyncStatus('synced');
-                alert('✅ Zapisano ' + rows.length + ' terenów do zakładki Tereny w arkuszu.');
+            function saveHiddenTereny() {
+                localStorage.setItem('servantHiddenTereny', JSON.stringify([...hiddenTereny]));
+            }
+
+            function isTerenHidden(id) {
+                return hiddenTereny.has(String(id));
+            }
+
+            function toggleTerenHidden(id) {
+                const key = String(id);
+                if (hiddenTereny.has(key)) hiddenTereny.delete(key);
+                else hiddenTereny.add(key);
+                saveHiddenTereny();
                 renderTerenList();
                 renderMap();
-            } catch (e) {
-                console.error('Import failed:', e);
-                updateSyncStatus('error', '❌ ' + e.message);
-                alert('❌ Import nie powiódł się:\n' + e.message);
-            } finally {
-                setSaving(false);
+                if (panelView === 'teren-detail' && String(selectedTerrainId) === key) {
+                    openTerenDetail(key);
+                }
             }
-        }
 
-        function exportTerenyCsv() {
-            syncMetaFromFeatures();
-            const rows = buildTerenyMetaArray();
-            const header = ['teren_nr', 'nazwa', 'parent_teren_nr', 'ostatnie_opracowanie', 'przypisany_typ', 'przypisany_id', 'data_przydzialu'];
-            const lines = [header.join('\t')];
-            rows.forEach(m => {
-                lines.push([
-                    m.teren_nr, m.nazwa, m.parent_teren_nr, m.ostatnie_opracowanie,
-                    m.przypisany_typ, m.przypisany_id, m.data_przydzialu
-                ].join('\t'));
-            });
-            const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/tab-separated-values;charset=utf-8' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'tereny-import.csv';
-            a.click();
-            URL.revokeObjectURL(a.href);
-        }
+            function sortFeatures() {
+                database.features.sort((a, b) => {
+                    const aId = String(getFeatureId(a));
+                    const bId = String(getFeatureId(b));
+                    const aM = aId.match(/^(\d+)(.*)/);
+                    const bM = bId.match(/^(\d+)(.*)/);
+                    if (aM && bM) {
+                        const d = parseInt(aM[1], 10) - parseInt(bM[1], 10);
+                        return d !== 0 ? d : aM[2].localeCompare(bM[2]);
+                    }
+                    return aId.localeCompare(bId, 'pl', { numeric: true });
+                });
+            }
 
-        function assigneeLabel(meta) {
-            if (!meta.przypisany_typ || !meta.przypisany_id) return '';
-            if (meta.przypisany_typ === 'grupa') return grupaLabel(meta.przypisany_id);
-            const b = bracia.find(x => String(x.id) === String(meta.przypisany_id));
-            return b ? bratLabel(b) : ('Brat ' + meta.przypisany_id);
-        }
+            function bratLabel(b) { return (b.imie + ' ' + b.nazwisko).trim() || ('Brat ' + b.id); }
 
-        function monthsAgo(dateStr) {
-            if (!dateStr) return Infinity;
-            const d = new Date(dateStr);
-            const now = new Date();
-            return (now - d) / (1000 * 60 * 60 * 24 * 30.44);
-        }
+            function grupaLabel(idOrName) {
+                const key = String(idOrName || '');
+                const g = grupy.find(x => String(x.id) === key || String(x.name) === key);
+                if (g) return g.name;
+                if (/^\d+$/.test(key)) {
+                    const legacy = grupy.find(x => x.name === 'Grupa ' + key);
+                    if (legacy) return legacy.name;
+                }
+                return key || 'Grupa';
+            }
 
-        function getTerritoryColor(meta, archived) {
-            if (archived) return CONFIG.COLORS.archived;
-            if (colorMode === 'staleness') {
-                const last = meta.ostatnie_opracowanie;
-                if (!last || monthsAgo(last) > 3) return CONFIG.COLORS.red;
+            function normalizeGrupaId(idOrName) {
+                return grupaLabel(idOrName);
+            }
+
+            function suggestNextGrupaName() {
+                const nums = grupy.map(g => {
+                    const m = String(g.name || g.id).match(/^Grupa\s+(\d+)$/i);
+                    return m ? parseInt(m[1], 10) : 0;
+                }).filter(n => n > 0);
+                const next = nums.length ? Math.max(...nums) + 1 : 2;
+                return 'Grupa ' + next;
+            }
+
+            function getMeta(id) {
+                const key = String(id);
+                if (!metaById[key]) {
+                    metaById[key] = terenyMeta[key] || {
+                        teren_nr: key, nazwa: '', parent_teren_nr: '', ostatnie_opracowanie: '',
+                        przypisany_typ: '', przypisany_id: '', data_przydzialu: '', completions: []
+                    };
+                }
+                return metaById[key];
+            }
+
+            function syncMetaFromFeatures() {
+                database.features.forEach(f => {
+                    const id = String(getFeatureId(f));
+                    const m = getMeta(id);
+                    m.teren_nr = id;
+                    m.nazwa = getFeatureTitle(f);
+                    if (f.properties?.parentId) m.parent_teren_nr = String(f.properties.parentId);
+                    terenyMeta[id] = m;
+                });
+            }
+
+            function buildTerenyMetaArray() {
+                return Object.values(metaById).map(m => ({
+                    teren_nr: m.teren_nr,
+                    nazwa: m.nazwa || '',
+                    parent_teren_nr: m.parent_teren_nr || '',
+                    ostatnie_opracowanie: m.ostatnie_opracowanie || '',
+                    przypisany_typ: m.przypisany_typ || '',
+                    przypisany_id: m.przypisany_id || '',
+                    data_przydzialu: m.data_przydzialu || '',
+                    completions: m.completions || []
+                }));
+            }
+
+            function assigneeLabel(meta) {
+                if (!meta.przypisany_typ || !meta.przypisany_id) return '';
+                if (meta.przypisany_typ === 'grupa') return grupaLabel(meta.przypisany_id);
+                const b = bracia.find(x => String(x.id) === String(meta.przypisany_id));
+                return b ? bratLabel(b) : ('Brat ' + meta.przypisany_id);
+            }
+
+            function monthsAgo(dateStr) {
+                if (!dateStr) return Infinity;
+                const d = new Date(dateStr);
+                const now = new Date();
+                return (now - d) / (1000 * 60 * 60 * 24 * 30.44);
+            }
+
+            function getTerritoryColor(meta, archived) {
+                if (archived) return CONFIG.COLORS.archived;
+                if (colorMode === 'staleness') {
+                    const last = meta.ostatnie_opracowanie;
+                    if (!last || monthsAgo(last) > 3) return CONFIG.COLORS.red;
+                    return CONFIG.COLORS.green;
+                }
+                if (!meta.przypisany_typ || !meta.przypisany_id) return CONFIG.COLORS.red;
+                if (!meta.data_przydzialu) return CONFIG.COLORS.yellow;
+                const comps = meta.completions || [];
+                if (!comps.length) return CONFIG.COLORS.orange;
                 return CONFIG.COLORS.green;
             }
-            if (!meta.przypisany_typ || !meta.przypisany_id) return CONFIG.COLORS.red;
-            if (!meta.data_przydzialu) return CONFIG.COLORS.yellow;
-            const comps = meta.completions || [];
-            if (!comps.length) return CONFIG.COLORS.orange;
-            return CONFIG.COLORS.green;
-        }
 
-        function passesFilter(id, meta) {
-            if (!filterType || !filterValue) return true;
-            if (filterType === 'grupa') {
-                return meta.przypisany_typ === 'grupa' && normalizeGrupaId(meta.przypisany_id) === normalizeGrupaId(filterValue);
-            }
-            if (filterType === 'brat') {
-                return meta.przypisany_typ === 'brat' && String(meta.przypisany_id) === filterValue;
-            }
-            return true;
-        }
-
-        function parentFeatures() {
-            return database.features.filter(f => !isSubteren(f) && !isArchived(f));
-        }
-
-        function subterenyOf(parentId) {
-            return database.features.filter(f =>
-                isSubteren(f) && String(getParentId(f)) === String(parentId) && !isArchived(f)
-            );
-        }
-
-        function terenyForBrat(bratId) {
-            return Object.values(metaById).filter(m =>
-                m.przypisany_typ === 'brat' && String(m.przypisany_id) === String(bratId)
-            );
-        }
-
-        function terenyForGrupa(grupaId) {
-            const want = normalizeGrupaId(grupaId);
-            return Object.values(metaById).filter(m =>
-                m.przypisany_typ === 'grupa' && normalizeGrupaId(m.przypisany_id) === want
-            );
-        }
-
-        // ── Sync ────────────────────────────────────────────────────────────
-        function updateSyncStatus(status, msg) {
-            syncStatusEl.className = 'sync-status ' + status;
-            const d = { synced: '✅ Zsynchronizowano', local: '⚠️ Dane lokalne', loading: '⏳ Ładowanie…', saving: '⏳ Zapisuję…', error: '❌ Błąd' };
-            syncStatusEl.textContent = msg || d[status] || '';
-        }
-
-        function setLoading(v, msg) {
-            const el = document.getElementById('loading-overlay');
-            if (v) { document.getElementById('loading-message').textContent = msg || 'Ładowanie…'; el.classList.add('visible'); el.removeAttribute('hidden'); }
-            else { el.classList.remove('visible'); el.setAttribute('hidden',''); }
-        }
-
-        function setSaving(s, msg) {
-            isSaving = s;
-            panelSheet.classList.toggle('is-saving', s);
-            panelSheet.querySelectorAll('button,input,select').forEach(el => { el.disabled = s; });
-            if (s) updateSyncStatus('saving', msg || '⏳ Zapisuję…');
-        }
-
-        function saveBundleLocal() {
-            localStorage.setItem('servantBundle', JSON.stringify({
-                database, bracia, grupy, grupaData, terenyMeta, opracowanie
-            }));
-        }
-
-        function loadBundleLocal() {
-            try {
-                const s = localStorage.getItem('servantBundle');
-                if (!s) return false;
-                const b = JSON.parse(s);
-                if (b.database) database = b.database;
-                if (b.bracia) bracia = b.bracia;
-                if (b.grupy) grupy = b.grupy;
-                if (b.grupaData) grupaData = b.grupaData;
-                if (b.terenyMeta) terenyMeta = b.terenyMeta;
-                if (b.opracowanie) opracowanie = b.opracowanie;
-                Object.keys(terenyMeta).forEach(k => { metaById[k] = terenyMeta[k]; });
+            function passesFilter(id, meta) {
+                if (!filterType || !filterValue) return true;
+                if (filterType === 'grupa') {
+                    return meta.przypisany_typ === 'grupa' && normalizeGrupaId(meta.przypisany_id) === normalizeGrupaId(filterValue);
+                }
+                if (filterType === 'brat') {
+                    return meta.przypisany_typ === 'brat' && String(meta.przypisany_id) === filterValue;
+                }
                 return true;
-            } catch (e) { return false; }
-        }
-
-        async function fetchWithTimeout(url, ms, init) {
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), ms || CONFIG.FETCH_TIMEOUT_MS);
-            try {
-                const res = await fetch(url, Object.assign({}, init || {}, { signal: ctrl.signal }));
-                clearTimeout(timer);
-                return res;
-            } catch (e) {
-                clearTimeout(timer);
-                if (e.name === 'AbortError') throw new Error('Przekroczono limit czasu połączenia');
-                throw e;
             }
-        }
 
-        async function apiGet(resource, extra) {
-            let url = CONFIG.DRIVE_SYNC_URL + '?resource=' + encodeURIComponent(resource) + '&t=' + Date.now();
-            if (extra) Object.keys(extra).forEach(k => { url += '&' + k + '=' + encodeURIComponent(extra[k]); });
-            const res = await fetchWithTimeout(url);
-            if (!res.ok) throw new Error('GET ' + resource + ' status ' + res.status);
-            return res.json();
-        }
-
-        async function loadTerenyGeoJson() {
-            if (window.location.protocol !== 'file:') {
-                try {
-                    const res = await fetch(CONFIG.DB_FILENAME + '?t=' + Date.now());
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data?.features?.length) return data;
-                    }
-                } catch (e) {
-                    console.warn('Local tereny.geojson failed:', e);
-                }
+            function parentFeatures() {
+                return database.features.filter(f => !isSubteren(f) && !isArchived(f));
             }
-            if (CONFIG.DRIVE_SYNC_URL) {
-                try {
-                    const res = await fetchWithTimeout(
-                        CONFIG.DRIVE_SYNC_URL + '?resource=tereny&t=' + Date.now()
-                    );
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data?.features) return data;
-                        if (data?.error) throw new Error(data.error);
-                    }
-                } catch (e) {
-                    console.warn('Drive tereny load failed:', e);
-                }
-            }
-            throw new Error('Nie udało się wczytać tereny.geojson');
-        }
 
-        async function loadGrupaDataForGrupy(grupyList) {
-            const data = {};
-            for (const g of grupyList) {
-                const sheetName = g.name || g.id;
-                try {
-                    data[sheetName] = await apiGet('grupa', { name: sheetName });
-                } catch (e) {
-                    console.warn('grupa', sheetName, e);
-                    data[sheetName] = { id: sheetName, name: sheetName, members: [], assignments: [] };
-                }
-            }
-            return data;
-        }
-
-        async function loadSheetBundle() {
-            try {
-                const bundle = await apiGet('bundle', { light: '1' });
-                if (bundle.error) throw new Error(bundle.error);
-                return bundle;
-            } catch (e) {
-                console.warn('Light bundle failed, trying parts:', e);
-                const out = { bracia: [], grupy: [], terenyMeta: [], grupaData: {}, opracowanie: {} };
-                try { out.bracia = await apiGet('bracia'); } catch (err) { console.warn(err); }
-                try { out.terenyMeta = await apiGet('tereny-meta'); } catch (err) { console.warn(err); }
-                try { out.grupy = await apiGet('grupy'); } catch (err) { console.warn(err); }
-                if (out.grupy.length) {
-                    out.grupaData = await loadGrupaDataForGrupy(out.grupy);
-                }
-                return out;
-            }
-        }
-
-        async function apiPost(body, timeoutMs) {
-            const res = await fetchWithTimeout(CONFIG.DRIVE_SYNC_URL, timeoutMs || CONFIG.FETCH_TIMEOUT_MS, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(body)
-            });
-            const text = await res.text();
-            let data;
-            try {
-                data = JSON.parse(text);
-            } catch (e) {
-                throw new Error(
-                    res.ok
-                        ? 'Nieprawidłowa odpowiedź serwera (nie JSON)'
-                        : ('POST status ' + res.status + ' — sprawdź wdrożenie Apps Script (dostęp: Każdy)')
+            function subterenyOf(parentId) {
+                return database.features.filter(f =>
+                    isSubteren(f) && String(getParentId(f)) === String(parentId) && !isArchived(f)
                 );
             }
-            if (!res.ok) throw new Error(data.error || ('POST status ' + res.status));
-            if (data.error) throw new Error(data.error);
-            return data;
-        }
 
-        function applySheetBundle(bundle) {
-            bracia = bundle.bracia || [];
-            grupy = bundle.grupy || [];
-            grupaData = bundle.grupaData || {};
-            opracowanie = bundle.opracowanie || {};
-            terenyMeta = {};
-            (bundle.terenyMeta || []).forEach(m => { terenyMeta[String(m.teren_nr)] = m; });
-            Object.keys(terenyMeta).forEach(k => { metaById[k] = terenyMeta[k]; });
-        }
-
-        async function loadBundle() {
-            setLoading(true, 'Ładowanie terenów…');
-            updateSyncStatus('loading', '⏳ Ładowanie terenów…');
-            try {
-                const terenyPromise = loadTerenyGeoJson();
-                const sheetsPromise = loadSheetBundle().catch(e => {
-                    console.warn('Sheets load failed:', e);
-                    return null;
-                });
-
-                database = await terenyPromise;
-                updateSyncStatus('loading', '⏳ Ładowanie arkusza…');
-
-                const sheetBundle = await sheetsPromise;
-                if (sheetBundle) {
-                    applySheetBundle(sheetBundle);
-                }
-
-                syncMetaFromFeatures();
-                saveBundleLocal();
-                updateSyncStatus('synced');
-            } catch (e) {
-                console.error('loadBundle failed:', e);
-                if (loadBundleLocal()) {
-                    syncMetaFromFeatures();
-                    updateSyncStatus('local', '⚠️ Offline — dane z pamięci (' + e.message + ')');
-                } else {
-                    updateSyncStatus('error', '❌ ' + e.message);
-                }
-            } finally {
-                setLoading(false);
+            function terenyForBrat(bratId) {
+                return Object.values(metaById).filter(m =>
+                    m.przypisany_typ === 'brat' && String(m.przypisany_id) === String(bratId)
+                );
             }
-        }
 
-        async function saveTereny(opts) {
-            opts = opts || {};
-            if (!opts.skipUi) setSaving(true);
-            try {
-                await apiPost({ resource: 'tereny', data: database });
-                saveBundleLocal();
-                if (!opts.skipUi) updateSyncStatus('synced');
-                return true;
-            } catch (e) {
-                if (!opts.skipUi) updateSyncStatus('error', '❌ ' + e.message);
-                throw e;
-            } finally {
-                if (!opts.skipUi) setSaving(false);
+            function terenyForGrupa(grupaId) {
+                const want = normalizeGrupaId(grupaId);
+                return Object.values(metaById).filter(m =>
+                    m.przypisany_typ === 'grupa' && normalizeGrupaId(m.przypisany_id) === want
+                );
             }
-        }
 
-        async function saveTerenyMeta(opts) {
-            opts = opts || {};
-            syncMetaFromFeatures();
-            if (!opts.skipUi) setSaving(true);
-            try {
-                const data = buildTerenyMetaArray();
-                await apiPost({ resource: 'tereny-meta', data: data }, 120000);
-                saveBundleLocal();
-                if (!opts.skipUi) updateSyncStatus('synced');
-                return true;
-            } catch (e) {
-                if (!opts.skipUi) updateSyncStatus('error', '❌ ' + e.message);
-                throw e;
-            } finally {
-                if (!opts.skipUi) setSaving(false);
+            // ── Sync ────────────────────────────────────────────────────────────
+            function updateSyncStatus(status, msg) {
+                syncStatusEl.className = 'sync-status ' + status;
+                const d = { synced: '✅ Zsynchronizowano', local: '⚠️ Dane lokalne', loading: '⏳ Ładowanie…', saving: '⏳ Zapisuję…', error: '❌ Błąd' };
+                syncStatusEl.textContent = msg || d[status] || '';
             }
-        }
 
-        async function saveBracia() {
-            grupy.forEach(g => {
-                const key = g.name || g.id;
-                grupaData[key] = grupaData[key] || { id: key, name: key, members: [], assignments: [] };
-                grupaData[key].members = bracia
-                    .filter(b => normalizeGrupaId(b.grupa_id) === normalizeGrupaId(key))
-                    .map(b => ({ id_brata: b.id, imie: b.imie, nazwisko: b.nazwisko }));
-            });
-            setSaving(true);
-            try {
-                await apiPost({ resource: 'bracia', data: bracia });
-                saveBundleLocal();
-                updateSyncStatus('synced');
-                return true;
-            } catch (e) {
-                updateSyncStatus('error', '❌ ' + e.message);
-                return false;
-            } finally { setSaving(false); }
-        }
-
-        async function saveGrupa(idOrName) {
-            const key = normalizeGrupaId(idOrName);
-            const g = grupaData[key] || { members: [], assignments: [] };
-            setSaving(true);
-            try {
-                await apiPost({ resource: 'grupa', id: key, name: key, members: g.members, assignments: g.assignments });
-                saveBundleLocal();
-                updateSyncStatus('synced');
-                return true;
-            } catch (e) {
-                updateSyncStatus('error', '❌ ' + e.message);
-                return false;
-            } finally { setSaving(false); }
-        }
-
-        async function postAction(action, payload) {
-            setSaving(true);
-            try {
-                const res = await apiPost(Object.assign({ action: action }, payload));
-                if (res.meta) {
-                    const id = String(res.meta.teren_nr);
-                    metaById[id] = res.meta;
-                    terenyMeta[id] = res.meta;
-                }
-                saveBundleLocal();
-                updateSyncStatus('synced');
-                return res;
-            } catch (e) {
-                updateSyncStatus('error', '❌ ' + e.message);
-                return null;
-            } finally { setSaving(false); }
-        }
-
-        // ── Map ─────────────────────────────────────────────────────────────
-        const map = L.map('map').setView([50, 20], 10);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-        const dbLayer = L.featureGroup().addTo(map);
-        const selectedLayer = L.featureGroup().addTo(map);
-        const drawnItems = L.featureGroup().addTo(map);
-
-        const drawControl = new L.Control.Draw({
-            draw: { polygon: { shapeOptions: { color: '#3498db' } }, polyline: false, rectangle: false, circle: false, marker: false, circlemarker: false },
-            edit: { featureGroup: drawnItems }
-        });
-
-        map.on(L.Draw.Event.CREATED, e => {
-            drawnItems.clearLayers();
-            drawnItems.addLayer(e.layer);
-            currentPolygon = e.layer;
-        });
-
-        map.on(L.Draw.Event.EDITED, () => {
-            if (drawnItems.getLayers().length) currentPolygon = drawnItems.getLayers()[0];
-        });
-
-        map.on(L.Draw.Event.DELETED, () => {
-            currentPolygon = null;
-        });
-
-        map.on('click', () => {
-            if (panelView !== 'tereny' && panelView !== 'teren-detail') return;
-            clearTerenSelection();
-        });
-
-        function clearTerenSelection() {
-            if (!selectedTerrainId) return;
-            selectedTerrainId = null;
-            selectedLayer.clearLayers();
-            if (panelView === 'teren-detail') {
-                setPanelView('tereny');
-            } else {
-                renderMap();
-                renderTerenList();
+            function setLoading(v, msg) {
+                const el = document.getElementById('loading-overlay');
+                if (v) { document.getElementById('loading-message').textContent = msg || 'Ładowanie…'; el.classList.add('visible'); el.removeAttribute('hidden'); }
+                else { el.classList.remove('visible'); el.setAttribute('hidden', ''); }
             }
-        }
 
-        function loadPolygonToDraw(feature) {
-            drawnItems.clearLayers();
-            currentPolygon = null;
-            if (!feature?.geometry?.coordinates?.[0]) return;
-            const latlngs = feature.geometry.coordinates[0].map(c => [c[1], c[0]]);
-            const polygon = L.polygon(latlngs, { color: '#3498db', fillColor: '#3498db', fillOpacity: 0.25 });
-            drawnItems.addLayer(polygon);
-            currentPolygon = polygon;
-            map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
-        }
+            function setSaving(s, msg) {
+                isSaving = s;
+                panelSheet.classList.toggle('is-saving', s);
+                panelSheet.querySelectorAll('button,input,select').forEach(el => { el.disabled = s; });
+                if (s) updateSyncStatus('saving', msg || '⏳ Zapisuję…');
+            }
 
-        function getNextTerenId() {
-            const parents = parentFeatures();
-            if (!parents.length) return '1';
-            const nums = parents.map(f => {
-                const m = String(getFeatureId(f)).match(/^(\d+)$/);
-                return m ? parseInt(m[1], 10) : 0;
-            }).filter(n => n > 0 && n < 900);
-            return nums.length ? String(Math.max(...nums) + 1) : '1';
-        }
-
-        function buildTerenFeatureFromForm(id, name) {
-            if (!currentPolygon) return null;
-            const latlngs = currentPolygon.getLatLngs()[0];
-            const coordinates = latlngs.map(ll => [
-                parseFloat(ll.lng.toFixed(CONFIG.COORD_PRECISION)),
-                parseFloat(ll.lat.toFixed(CONFIG.COORD_PRECISION))
-            ]);
-            const first = coordinates[0], last = coordinates[coordinates.length - 1];
-            if (first[0] !== last[0] || first[1] !== last[1]) coordinates.push([first[0], first[1]]);
-
-            const existing = database.features.find(f => String(getFeatureId(f)) === String(id));
-            const props = {
-                id: id,
-                title: name,
-                name: name,
-                stroke: '#e74c3c',
-                'stroke-opacity': 1,
-                'stroke-width': 3,
-                fill: '#e74c3c',
-                'fill-opacity': 0.15,
-                created: existing?.properties?.created || new Date().toISOString()
-            };
-            if (existing?.properties?.description) props.description = existing.properties.description;
-
-            return {
-                type: 'Feature',
-                id: id,
-                geometry: { type: 'Polygon', coordinates: [coordinates] },
-                properties: props
-            };
-        }
-
-        function polygonLatLngs(f) {
-            return f.geometry.coordinates[0].map(c => [c[1], c[0]]);
-        }
-
-        function terrainStyle(f) {
-            const id = getFeatureId(f);
-            const meta = getMeta(id);
-            const col = getTerritoryColor(meta, isArchived(f));
-            const faded = selectedTerrainId && String(id) !== String(selectedTerrainId);
-            return {
-                color: col, fillColor: col,
-                opacity: faded ? 0.5 : 1, fillOpacity: faded ? 0.12 : (isSubteren(f) ? 0.35 : 0.2),
-                weight: isSubteren(f) ? 2 : 3, dashArray: isSubteren(f) ? '4,4' : '5,5'
-            };
-        }
-
-        function renderMap() {
-            dbLayer.clearLayers();
-            Object.keys(featureById).forEach(k => delete featureById[k]);
-            Object.keys(layerById).forEach(k => delete layerById[k]);
-
-            database.features.forEach(f => {
-                const id = getFeatureId(f);
-                if (!passesFilter(id, getMeta(id))) return;
-                featureById[id] = f;
-                const layer = L.polygon(polygonLatLngs(f), terrainStyle(f)).addTo(dbLayer);
-                layer.on('click', e => {
-                    L.DomEvent.stopPropagation(e);
-                    if (panelView === 'tereny' || panelView === 'teren-detail') openTerenDetail(id);
-                });
-                layerById[id] = layer;
-            });
-
-            if (selectedTerrainId && layerById[selectedTerrainId]) {
-                const f = featureById[selectedTerrainId];
-                selectedLayer.clearLayers();
-                const hl = L.polygon(polygonLatLngs(f), Object.assign(terrainStyle(f), {
-                    fillOpacity: 0.4, weight: 4, interactive: false
+            function saveBundleLocal() {
+                localStorage.setItem('servantBundle', JSON.stringify({
+                    database, bracia, grupy, grupaData, terenyMeta, opracowanie
                 }));
-                selectedLayer.addLayer(hl);
-            } else {
-                selectedLayer.clearLayers();
             }
 
-            if (dbLayer.getLayers().length && dbLayer.getBounds().isValid()) {
-                map.fitBounds(dbLayer.getBounds(), { padding: [40, 40] });
-            }
-        }
-
-        function setDrawMode(on, bannerText) {
-            const banner = document.getElementById('draw-banner');
-            if (on) {
-                map.addControl(drawControl);
-                banner.textContent = bannerText || 'Rysuj granice na mapie';
-                banner.classList.add('visible');
-            } else {
-                map.removeControl(drawControl);
-                banner.classList.remove('visible');
-                drawnItems.clearLayers();
-                currentPolygon = null;
-            }
-        }
-
-        // ── Views ───────────────────────────────────────────────────────────
-        function setPanelView(view) {
-            panelView = view;
-            document.querySelectorAll('.panel-view').forEach(el => el.classList.remove('active'));
-            const el = document.getElementById('view-' + view);
-            if (el) el.classList.add('active');
-            const drawBanners = {
-                draw: 'Rysuj granice subterenu na mapie',
-                'teren-editor': 'Narysuj lub edytuj granice terenu na mapie'
-            };
-            setDrawMode(view === 'draw' || view === 'teren-editor', drawBanners[view]);
-            if (view === 'tereny') renderTerenList();
-            if (view === 'bracia') renderBraciaList();
-            if (view === 'grupy') renderGrupyList();
-            renderMap();
-            setTimeout(() => map.invalidateSize(), 50);
-        }
-
-        function setTab(tab) {
-            activeTab = tab;
-            document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-            setPanelView(tab);
-        }
-
-        function renderLegend() {
-            const el = document.getElementById('color-legend');
-            if (colorMode === 'staleness') {
-                el.innerHTML = '<span class="legend-item"><span class="legend-dot" style="background:' + CONFIG.COLORS.red + '"></span>>3 mies.</span>' +
-                    '<span class="legend-item"><span class="legend-dot" style="background:' + CONFIG.COLORS.green + '"></span>świeże</span>';
-            } else {
-                el.innerHTML = [
-                    ['red','Utworzony'],['yellow','Przypisany'],['orange','+ data przydziału'],['green','+ opracowany']
-                ].map(([k,l]) => '<span class="legend-item"><span class="legend-dot" style="background:' + CONFIG.COLORS[k] + '"></span>' + l + '</span>').join('');
-            }
-        }
-
-        function renderTerenList() {
-            renderLegend();
-            const list = document.getElementById('teren-list');
-            const parents = parentFeatures().filter(f => passesFilter(getFeatureId(f), getMeta(getFeatureId(f))));
-            document.getElementById('teren-count').textContent = 'Tereny: ' + parents.length;
-
-            if (!parents.length) {
-                list.innerHTML = '<p class="list-empty">Brak terenów — dodaj pierwszy</p>';
-                return;
+            function loadBundleLocal() {
+                try {
+                    const s = localStorage.getItem('servantBundle');
+                    if (!s) return false;
+                    const b = JSON.parse(s);
+                    if (b.database) database = b.database;
+                    if (b.bracia) bracia = b.bracia;
+                    if (b.grupy) grupy = b.grupy;
+                    if (b.grupaData) grupaData = b.grupaData;
+                    if (b.terenyMeta) terenyMeta = b.terenyMeta;
+                    if (b.opracowanie) opracowanie = b.opracowanie;
+                    Object.keys(terenyMeta).forEach(k => { metaById[k] = terenyMeta[k]; });
+                    return true;
+                } catch (e) { return false; }
             }
 
-            let html = '';
-            parents.forEach(f => {
-                html += renderTerenItem(f);
-                subterenyOf(getFeatureId(f)).forEach(sf => { html += renderTerenItem(sf, true); });
-            });
-            list.innerHTML = html;
+            async function fetchWithTimeout(url, ms, init) {
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), ms || CONFIG.FETCH_TIMEOUT_MS);
+                try {
+                    const res = await fetch(url, Object.assign({}, init || {}, { signal: ctrl.signal }));
+                    clearTimeout(timer);
+                    return res;
+                } catch (e) {
+                    clearTimeout(timer);
+                    if (e.name === 'AbortError') throw new Error('Przekroczono limit czasu połączenia');
+                    throw e;
+                }
+            }
 
-            list.querySelectorAll('.teren-item').forEach(item => {
-                item.addEventListener('click', e => {
-                    if (e.target.closest('button')) return;
-                    openTerenDetail(item.dataset.id);
+            async function apiGet(resource, extra) {
+                let url = CONFIG.DRIVE_SYNC_URL + '?resource=' + encodeURIComponent(resource) + '&t=' + Date.now();
+                if (extra) Object.keys(extra).forEach(k => { url += '&' + k + '=' + encodeURIComponent(extra[k]); });
+                const res = await fetchWithTimeout(url);
+                if (!res.ok) throw new Error('GET ' + resource + ' status ' + res.status);
+                return res.json();
+            }
+
+            async function loadTerenyGeoJson() {
+                if (window.location.protocol !== 'file:') {
+                    try {
+                        const res = await fetch(CONFIG.DB_FILENAME + '?t=' + Date.now());
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data?.features?.length) return data;
+                        }
+                    } catch (e) {
+                        console.warn('Local tereny.geojson failed:', e);
+                    }
+                }
+                if (CONFIG.DRIVE_SYNC_URL) {
+                    try {
+                        const res = await fetchWithTimeout(
+                            CONFIG.DRIVE_SYNC_URL + '?resource=tereny&t=' + Date.now()
+                        );
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data?.features) return data;
+                            if (data?.error) throw new Error(data.error);
+                        }
+                    } catch (e) {
+                        console.warn('Drive tereny load failed:', e);
+                    }
+                }
+                throw new Error('Nie udało się wczytać tereny.geojson');
+            }
+
+            async function loadGrupaDataForGrupy(grupyList) {
+                const data = {};
+                for (const g of grupyList) {
+                    const sheetName = g.name || g.id;
+                    try {
+                        data[sheetName] = await apiGet('grupa', { name: sheetName });
+                    } catch (e) {
+                        console.warn('grupa', sheetName, e);
+                        data[sheetName] = { id: sheetName, name: sheetName, members: [], assignments: [] };
+                    }
+                }
+                return data;
+            }
+
+            async function loadSheetBundle() {
+                try {
+                    const bundle = await apiGet('bundle', { light: '1' });
+                    if (bundle.error) throw new Error(bundle.error);
+                    return bundle;
+                } catch (e) {
+                    console.warn('Light bundle failed, trying parts:', e);
+                    const out = { bracia: [], grupy: [], terenyMeta: [], grupaData: {}, opracowanie: {} };
+                    try { out.bracia = await apiGet('bracia'); } catch (err) { console.warn(err); }
+                    try { out.terenyMeta = await apiGet('tereny-meta'); } catch (err) { console.warn(err); }
+                    try { out.grupy = await apiGet('grupy'); } catch (err) { console.warn(err); }
+                    if (out.grupy.length) {
+                        out.grupaData = await loadGrupaDataForGrupy(out.grupy);
+                    }
+                    return out;
+                }
+            }
+
+            async function apiPost(body, timeoutMs) {
+                const res = await fetchWithTimeout(CONFIG.DRIVE_SYNC_URL, timeoutMs || CONFIG.FETCH_TIMEOUT_MS, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(body)
                 });
-            });
-            bindTerenActions(list);
-        }
-
-        function renderTerenItem(f, nested) {
-            const id = getFeatureId(f);
-            const meta = getMeta(id);
-            const col = getTerritoryColor(meta, isArchived(f));
-            const assignee = assigneeLabel(meta);
-            const lastComp = (meta.completions || []).slice(-1)[0];
-            const sel = selectedTerrainId === String(id) ? ' selected' : '';
-            const cls = 'teren-item' + (nested ? ' subteren' : '') + (isArchived(f) ? ' archived' : '') + sel;
-            return '<div class="' + cls + '" data-id="' + escapeHtml(id) + '">' +
-                '<div class="teren-item-actions">' +
-                '<button class="action-btn edit" data-id="' + escapeHtml(id) + '" title="Edytuj" type="button">✎</button>' +
-                '<button class="action-btn delete" data-id="' + escapeHtml(id) + '" title="Usuń" type="button">✕</button>' +
-                '</div>' +
-                '<strong>' + escapeHtml(id) + '. ' + escapeHtml(getFeatureTitle(f)) + '</strong>' +
-                '<span class="teren-color-dot" style="background:' + col + '"></span>' +
-                (assignee ? '<span class="badge ' + (meta.przypisany_typ === 'grupa' ? 'badge-group' : 'badge-brat') + '">' + escapeHtml(assignee) + '</span>' : '') +
-                '<div class="teren-meta">' +
-                (meta.data_przydzialu ? 'Przydział: ' + escapeHtml(meta.data_przydzialu) : 'Brak daty przydziału') +
-                (lastComp ? ' · Oprac.: ' + escapeHtml(lastComp.date) : '') +
-                (meta.ostatnie_opracowanie ? ' · Ostatnio zdany: ' + escapeHtml(meta.ostatnie_opracowanie) : '') +
-                '</div></div>';
-        }
-
-        function bindTerenActions(container) {
-            container.querySelectorAll('.action-btn.edit').forEach(btn => {
-                btn.addEventListener('click', e => {
-                    e.stopPropagation();
-                    openTerenEditor(btn.dataset.id);
-                });
-            });
-            container.querySelectorAll('.action-btn.delete').forEach(btn => {
-                btn.addEventListener('click', e => {
-                    e.stopPropagation();
-                    deleteTeren(btn.dataset.id);
-                });
-            });
-        }
-
-        function openTerenEditor(id) {
-            isCreatingNewTeren = !id;
-            editingTerenId = id || null;
-            const idInput = document.getElementById('teren-editor-id');
-            const nameInput = document.getElementById('teren-editor-name');
-
-            if (id) {
-                const f = database.features.find(t => String(getFeatureId(t)) === String(id));
-                if (!f || isSubteren(f)) return;
-                document.getElementById('teren-editor-title').textContent = 'Edycja terenu';
-                idInput.value = id;
-                idInput.readOnly = true;
-                nameInput.value = getFeatureTitle(f);
-                loadPolygonToDraw(f);
-            } else {
-                const nextId = getNextTerenId();
-                document.getElementById('teren-editor-title').textContent = 'Nowy teren';
-                idInput.value = nextId;
-                idInput.readOnly = false;
-                nameInput.value = 'Teren ' + nextId;
-                drawnItems.clearLayers();
-                currentPolygon = null;
+                const text = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    throw new Error(
+                        res.ok
+                            ? 'Nieprawidłowa odpowiedź serwera (nie JSON)'
+                            : ('POST status ' + res.status + ' — sprawdź wdrożenie Apps Script (dostęp: Każdy)')
+                    );
+                }
+                if (!res.ok) throw new Error(data.error || ('POST status ' + res.status));
+                if (data.error) throw new Error(data.error);
+                return data;
             }
 
-            selectedTerrainId = id ? String(id) : null;
-            setPanelView('teren-editor');
-            expandSheet();
-        }
-
-        async function saveTerenEditor() {
-            const id = document.getElementById('teren-editor-id').value.trim();
-            const name = document.getElementById('teren-editor-name').value.trim() || ('Teren ' + id);
-            if (!id) { alert('Podaj numer terenu.'); return; }
-            if (!currentPolygon) { alert('Narysuj granice terenu na mapie.'); return; }
-
-            const feature = buildTerenFeatureFromForm(id, name);
-            if (!feature) return;
-
-            const existingIdx = database.features.findIndex(f => String(getFeatureId(f)) === String(id));
-            if (existingIdx !== -1 && String(editingTerenId) !== String(id)) {
-                if (!confirm('Teren „' + id + '” już istnieje. Nadpisać?')) return;
-                database.features.splice(existingIdx, 1);
-            } else if (existingIdx !== -1) {
-                database.features.splice(existingIdx, 1);
+            function applySheetBundle(bundle) {
+                bracia = bundle.bracia || [];
+                grupy = bundle.grupy || [];
+                grupaData = bundle.grupaData || {};
+                opracowanie = bundle.opracowanie || {};
+                terenyMeta = {};
+                (bundle.terenyMeta || []).forEach(m => { terenyMeta[String(m.teren_nr)] = m; });
+                Object.keys(terenyMeta).forEach(k => { metaById[k] = terenyMeta[k]; });
             }
 
-            database.features.push(feature);
-            sortFeatures();
+            async function loadBundle() {
+                loadHiddenTereny();
+                setLoading(true, 'Ładowanie terenów…');
+                updateSyncStatus('loading', '⏳ Ładowanie terenów…');
+                try {
+                    const terenyPromise = loadTerenyGeoJson();
+                    const sheetsPromise = loadSheetBundle().catch(e => {
+                        console.warn('Sheets load failed:', e);
+                        return null;
+                    });
 
-            const meta = getMeta(id);
-            meta.teren_nr = id;
-            meta.nazwa = name;
-            meta.parent_teren_nr = '';
-            terenyMeta[id] = meta;
+                    database = await terenyPromise;
+                    updateSyncStatus('loading', '⏳ Ładowanie arkusza…');
 
-            setSaving(true, '⏳ Zapisuję teren…');
-            try {
-                const okGeo = await saveTereny({ skipUi: true });
-                try { await saveTerenyMeta({ skipUi: true }); } catch (e) { console.warn(e); }
+                    const sheetBundle = await sheetsPromise;
+                    if (sheetBundle) {
+                        applySheetBundle(sheetBundle);
+                    }
 
-                editingTerenId = id;
-                isCreatingNewTeren = false;
-                selectedTerrainId = String(id);
+                    syncMetaFromFeatures();
+                    saveBundleLocal();
+                    updateSyncStatus('synced');
+                } catch (e) {
+                    console.error('loadBundle failed:', e);
+                    if (loadBundleLocal()) {
+                        syncMetaFromFeatures();
+                        updateSyncStatus('local', '⚠️ Offline — dane z pamięci (' + e.message + ')');
+                    } else {
+                        updateSyncStatus('error', '❌ ' + e.message);
+                    }
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            async function saveTereny(opts) {
+                opts = opts || {};
+                if (!opts.skipUi) setSaving(true);
+                try {
+                    await apiPost({ resource: 'tereny', data: database });
+                    saveBundleLocal();
+                    if (!opts.skipUi) updateSyncStatus('synced');
+                    return true;
+                } catch (e) {
+                    if (!opts.skipUi) updateSyncStatus('error', '❌ ' + e.message);
+                    throw e;
+                } finally {
+                    if (!opts.skipUi) setSaving(false);
+                }
+            }
+
+            async function saveTerenyMeta(opts) {
+                opts = opts || {};
+                syncMetaFromFeatures();
+                if (!opts.skipUi) setSaving(true);
+                try {
+                    const data = buildTerenyMetaArray();
+                    await apiPost({ resource: 'tereny-meta', data: data }, 120000);
+                    saveBundleLocal();
+                    if (!opts.skipUi) updateSyncStatus('synced');
+                    return true;
+                } catch (e) {
+                    if (!opts.skipUi) updateSyncStatus('error', '❌ ' + e.message);
+                    throw e;
+                } finally {
+                    if (!opts.skipUi) setSaving(false);
+                }
+            }
+
+            async function saveBracia() {
+                grupy.forEach(g => {
+                    const key = g.name || g.id;
+                    grupaData[key] = grupaData[key] || { id: key, name: key, members: [], assignments: [] };
+                    grupaData[key].members = bracia
+                        .filter(b => normalizeGrupaId(b.grupa_id) === normalizeGrupaId(key))
+                        .map(b => ({ id_brata: b.id, imie: b.imie, nazwisko: b.nazwisko }));
+                });
+                setSaving(true);
+                try {
+                    await apiPost({ resource: 'bracia', data: bracia });
+                    saveBundleLocal();
+                    updateSyncStatus('synced');
+                    return true;
+                } catch (e) {
+                    updateSyncStatus('error', '❌ ' + e.message);
+                    return false;
+                } finally { setSaving(false); }
+            }
+
+            async function saveGrupa(idOrName) {
+                const key = normalizeGrupaId(idOrName);
+                const g = grupaData[key] || { members: [], assignments: [] };
+                setSaving(true);
+                try {
+                    await apiPost({ resource: 'grupa', id: key, name: key, members: g.members, assignments: g.assignments });
+                    saveBundleLocal();
+                    updateSyncStatus('synced');
+                    return true;
+                } catch (e) {
+                    updateSyncStatus('error', '❌ ' + e.message);
+                    return false;
+                } finally { setSaving(false); }
+            }
+
+            async function postAction(action, payload) {
+                setSaving(true);
+                try {
+                    const res = await apiPost(Object.assign({ action: action }, payload));
+                    if (res.meta) {
+                        applyTerenMeta(res.meta);
+                    }
+                    saveBundleLocal();
+                    updateSyncStatus('synced');
+                    return res;
+                } catch (e) {
+                    updateSyncStatus('error', '❌ ' + e.message);
+                    return null;
+                } finally { setSaving(false); }
+            }
+
+            function applyTerenMeta(meta) {
+                const id = String(meta.teren_nr);
+                metaById[id] = meta;
+                terenyMeta[id] = meta;
+            }
+
+            function refreshAfterTerenMetaChange(terenId) {
                 renderTerenList();
                 renderMap();
-                openTerenDetail(id);
-                updateSyncStatus('synced');
-
-                if (okGeo) alert('✅ Zapisano teren „' + name + '”');
-            } catch (e) {
-                updateSyncStatus('error', '❌ ' + e.message);
-                alert('❌ Zapis nie powiódł się:\n' + e.message);
-            } finally {
-                setSaving(false);
+                if (activeTab === 'bracia') {
+                    if (panelView === 'brat-detail' && selectedBratId) {
+                        openBratDetail(selectedBratId);
+                    } else if (panelView === 'teren-detail' && terenId) {
+                        openTerenDetail(terenId);
+                    } else {
+                        renderBraciaList();
+                    }
+                } else if (activeTab === 'grupy') {
+                    renderGrupyList();
+                } else if (panelView === 'teren-detail' && terenId) {
+                    openTerenDetail(terenId);
+                }
             }
-        }
 
-        async function deleteTeren(id) {
-            const f = database.features.find(t => String(getFeatureId(t)) === String(id));
-            if (!f) return;
-            const subs = isSubteren(f) ? [] : subterenyOf(id);
-            const msg = subs.length
-                ? 'Usunąć teren „' + getFeatureTitle(f) + '” wraz z ' + subs.length + ' subterenami?'
-                : 'Usunąć teren „' + getFeatureTitle(f) + '”?';
-            if (!confirm(msg)) return;
+            async function clearTerenAssignment(terenId, clearHistory) {
+                const meta = getMeta(terenId);
+                meta.przypisany_typ = '';
+                meta.przypisany_id = '';
+                meta.data_przydzialu = '';
+                if (clearHistory) meta.completions = [];
+                applyTerenMeta(meta);
 
-            setSaving(true, '⏳ Usuwam teren…');
-            try {
-                const removeIds = new Set([String(id), ...subs.map(s => String(getFeatureId(s)))]);
-                database.features = database.features.filter(t => !removeIds.has(String(getFeatureId(t))));
-                removeIds.forEach(rid => {
-                    delete metaById[rid];
-                    delete terenyMeta[rid];
+                setSaving(true, '⏳ Usuwam przydział…');
+                try {
+                    await saveTerenyMeta({ skipUi: true });
+                    updateSyncStatus('synced');
+                    refreshAfterTerenMetaChange(terenId);
+                    return true;
+                } catch (e) {
+                    updateSyncStatus('error', '❌ ' + e.message);
+                    alert('❌ Usuwanie przydziału nie powiodło się:\n' + e.message);
+                    return false;
+                } finally {
+                    setSaving(false);
+                }
+            }
+
+            // ── Map ─────────────────────────────────────────────────────────────
+            const map = L.map('map').setView([50, 20], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+            const dbLayer = L.featureGroup().addTo(map);
+            const selectedLayer = L.featureGroup().addTo(map);
+            const drawnItems = L.featureGroup().addTo(map);
+
+            const drawControl = new L.Control.Draw({
+                draw: { polygon: { shapeOptions: { color: '#3498db' } }, polyline: false, rectangle: false, circle: false, marker: false, circlemarker: false },
+                edit: { featureGroup: drawnItems }
+            });
+
+            map.on(L.Draw.Event.CREATED, e => {
+                drawnItems.clearLayers();
+                drawnItems.addLayer(e.layer);
+                currentPolygon = e.layer;
+                updateTerenPolygonStatus();
+            });
+
+            map.on(L.Draw.Event.EDITED, () => {
+                if (drawnItems.getLayers().length) currentPolygon = drawnItems.getLayers()[0];
+                updateTerenPolygonStatus();
+            });
+
+            map.on(L.Draw.Event.DELETED, () => {
+                currentPolygon = null;
+                updateTerenPolygonStatus();
+            });
+
+            map.on('click', () => {
+                if (panelView !== 'tereny' && panelView !== 'teren-detail') return;
+                clearTerenSelection();
+            });
+
+            function clearTerenSelection() {
+                if (!selectedTerrainId) return;
+                selectedTerrainId = null;
+                selectedLayer.clearLayers();
+                if (panelView === 'teren-detail') {
+                    setPanelView('tereny');
+                } else {
+                    renderMap();
+                    renderTerenList();
+                }
+            }
+
+            function loadPolygonToDraw(feature) {
+                drawnItems.clearLayers();
+                currentPolygon = null;
+                if (!feature?.geometry?.coordinates?.[0]) return;
+                const latlngs = feature.geometry.coordinates[0].map(c => [c[1], c[0]]);
+                const polygon = L.polygon(latlngs, { color: '#3498db', fillColor: '#3498db', fillOpacity: 0.25 });
+                drawnItems.addLayer(polygon);
+                currentPolygon = polygon;
+                map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+                updateTerenPolygonStatus();
+            }
+
+            function getNextTerenId() {
+                const parents = parentFeatures();
+                if (!parents.length) return '1';
+                const nums = parents.map(f => {
+                    const m = String(getFeatureId(f)).match(/^(\d+)$/);
+                    return m ? parseInt(m[1], 10) : 0;
+                }).filter(n => n > 0 && n < 900);
+                return nums.length ? String(Math.max(...nums) + 1) : '1';
+            }
+
+            function buildTerenFeatureFromForm(id, name, desc) {
+                if (!currentPolygon) return null;
+                const latlngs = currentPolygon.getLatLngs()[0];
+                const coordinates = latlngs.map(ll => [
+                    parseFloat(ll.lng.toFixed(CONFIG.COORD_PRECISION)),
+                    parseFloat(ll.lat.toFixed(CONFIG.COORD_PRECISION))
+                ]);
+                const first = coordinates[0], last = coordinates[coordinates.length - 1];
+                if (first[0] !== last[0] || first[1] !== last[1]) coordinates.push([first[0], first[1]]);
+
+                const existing = database.features.find(f => String(getFeatureId(f)) === String(id));
+                const props = {
+                    id: id,
+                    title: name,
+                    name: name,
+                    stroke: '#e74c3c',
+                    'stroke-opacity': 1,
+                    'stroke-width': 3,
+                    fill: '#e74c3c',
+                    'fill-opacity': 0.15,
+                    created: existing?.properties?.created || new Date().toISOString()
+                };
+                if (desc) props.description = desc;
+
+                return {
+                    type: 'Feature',
+                    id: id,
+                    geometry: { type: 'Polygon', coordinates: [coordinates] },
+                    properties: props
+                };
+            }
+
+            function polygonLatLngs(f) {
+                return f.geometry.coordinates[0].map(c => [c[1], c[0]]);
+            }
+
+            function terrainStyle(f) {
+                const id = getFeatureId(f);
+                const meta = getMeta(id);
+                const col = getTerritoryColor(meta, isArchived(f));
+                const faded = selectedTerrainId && String(id) !== String(selectedTerrainId);
+                return {
+                    color: col, fillColor: col,
+                    opacity: faded ? 0.5 : 1, fillOpacity: faded ? 0.12 : (isSubteren(f) ? 0.35 : 0.2),
+                    weight: isSubteren(f) ? 2 : 3, dashArray: isSubteren(f) ? '4,4' : '5,5'
+                };
+            }
+
+            function renderMap() {
+                dbLayer.clearLayers();
+                Object.keys(featureById).forEach(k => delete featureById[k]);
+                Object.keys(layerById).forEach(k => delete layerById[k]);
+
+                database.features.forEach(f => {
+                    const id = getFeatureId(f);
+                    if (!passesFilter(id, getMeta(id))) return;
+                    if (isTerenHidden(id)) return;
+                    featureById[id] = f;
+                    const layer = L.polygon(polygonLatLngs(f), terrainStyle(f)).addTo(dbLayer);
+                    layer.on('click', e => {
+                        L.DomEvent.stopPropagation(e);
+                        if (panelView === 'tereny' || panelView === 'teren-detail') openTerenDetail(id);
+                    });
+                    layerById[id] = layer;
                 });
 
-                if (String(selectedTerrainId) === String(id)) {
-                    selectedTerrainId = null;
+                if (selectedTerrainId && layerById[selectedTerrainId]) {
+                    const f = featureById[selectedTerrainId];
+                    selectedLayer.clearLayers();
+                    const hl = L.polygon(polygonLatLngs(f), Object.assign(terrainStyle(f), {
+                        fillOpacity: 0.4, weight: 4, interactive: false
+                    }));
+                    selectedLayer.addLayer(hl);
+                } else {
+                    selectedLayer.clearLayers();
+                }
+
+                if (dbLayer.getLayers().length && dbLayer.getBounds().isValid()
+                    && panelView !== 'teren-draw' && panelView !== 'draw') {
+                    map.fitBounds(dbLayer.getBounds(), { padding: [40, 40] });
+                }
+            }
+
+            function updateTerenPolygonStatus() {
+                const el = document.getElementById('teren-polygon-status');
+                if (!el) return;
+                el.textContent = currentPolygon
+                    ? '✓ Granice narysowane — możesz zapisać teren.'
+                    : 'Brak granic — kliknij „Rysuj granice na mapie”.';
+            }
+
+            function setDrawMode(on, bannerText, opts) {
+                opts = opts || {};
+                const banner = document.getElementById('draw-banner');
+                if (on) {
+                    map.addControl(drawControl);
+                    banner.textContent = bannerText || 'Rysuj granice na mapie';
+                    banner.classList.add('visible');
+                } else {
+                    map.removeControl(drawControl);
+                    banner.classList.remove('visible');
+                    if (!opts.keepPolygon) {
+                        drawnItems.clearLayers();
+                        currentPolygon = null;
+                    }
+                }
+                updateTerenPolygonStatus();
+            }
+
+            function openTerenDrawMode() {
+                const id = document.getElementById('teren-editor-id').value.trim();
+                if (!id) { alert('Podaj numer terenu przed rysowaniem.'); return; }
+
+                if (!currentPolygon) {
+                    const existing = database.features.find(f => String(getFeatureId(f)) === String(id));
+                    if (existing) loadPolygonToDraw(existing);
+                }
+
+                drawContext = 'teren';
+                setPanelView('teren-draw');
+                if (window.matchMedia('(min-width:768px)').matches) {
+                    expandSheet();
+                } else {
+                    collapseSheet();
+                }
+            }
+
+            function backFromTerenDraw() {
+                drawContext = null;
+                setPanelView('teren-editor');
+                expandSheet();
+            }
+
+            function finishTerenDrawMode() {
+                if (!currentPolygon) {
+                    alert('Narysuj wielokąt na mapie (ikona wielokąta u góry po lewej).');
+                    return;
+                }
+                backFromTerenDraw();
+            }
+
+            // ── Views ───────────────────────────────────────────────────────────
+            function setPanelView(view) {
+                panelView = view;
+                document.querySelectorAll('.panel-view').forEach(el => el.classList.remove('active'));
+                const el = document.getElementById('view-' + view);
+                if (el) el.classList.add('active');
+                const drawBanners = {
+                    draw: 'Rysuj granice subterenu na mapie',
+                    'teren-draw': 'Rysuj lub edytuj granice terenu na mapie'
+                };
+                const inDraw = view === 'draw' || view === 'teren-draw';
+                setDrawMode(inDraw, drawBanners[view], { keepPolygon: view === 'teren-editor' });
+                if (view === 'tereny') renderTerenList();
+                if (view === 'bracia') renderBraciaList();
+                if (view === 'grupy') renderGrupyList();
+                renderMap();
+                if (view === 'teren-editor') {
+                    expandSheet();
+                    updateTerenPolygonStatus();
+                } else if (view !== 'draw' && view !== 'teren-draw' && view !== 'teren-editor') {
+                    expandSheet();
+                }
+                setTimeout(() => map.invalidateSize(), 50);
+            }
+
+            function setTab(tab) {
+                activeTab = tab;
+                selectedBratId = null;
+                document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+                setPanelView(tab);
+            }
+
+            function renderLegend() {
+                const el = document.getElementById('color-legend');
+                if (colorMode === 'staleness') {
+                    el.innerHTML = '<span class="legend-item"><span class="legend-dot" style="background:' + CONFIG.COLORS.red + '"></span>>3 mies.</span>' +
+                        '<span class="legend-item"><span class="legend-dot" style="background:' + CONFIG.COLORS.green + '"></span>świeże</span>';
+                } else {
+                    el.innerHTML = [
+                        ['red', 'Utworzony'], ['yellow', 'Przypisany'], ['orange', '+ data przydziału'], ['green', '+ opracowany']
+                    ].map(([k, l]) => '<span class="legend-item"><span class="legend-dot" style="background:' + CONFIG.COLORS[k] + '"></span>' + l + '</span>').join('');
+                }
+            }
+
+            function renderTerenList() {
+                renderLegend();
+                const list = document.getElementById('teren-list');
+                const parents = parentFeatures().filter(f => passesFilter(getFeatureId(f), getMeta(getFeatureId(f))));
+                document.getElementById('teren-count').textContent = 'Tereny: ' + parents.length;
+
+                if (!parents.length) {
+                    list.innerHTML = '<p class="list-empty">Brak terenów — dodaj pierwszy</p>';
+                    return;
+                }
+
+                let html = '';
+                parents.forEach(f => {
+                    html += renderTerenItem(f);
+                    subterenyOf(getFeatureId(f)).forEach(sf => { html += renderTerenItem(sf, true); });
+                });
+                list.innerHTML = html;
+
+                list.querySelectorAll('.teren-item').forEach(item => {
+                    item.addEventListener('click', e => {
+                        if (e.target.closest('button')) return;
+                        openTerenDetail(item.dataset.id);
+                    });
+                });
+                bindTerenActions(list);
+            }
+
+            function renderTerenItem(f, nested) {
+                const id = getFeatureId(f);
+                const meta = getMeta(id);
+                const col = getTerritoryColor(meta, isArchived(f));
+                const assignee = assigneeLabel(meta);
+                const lastComp = (meta.completions || []).slice(-1)[0];
+                const sel = selectedTerrainId === String(id) ? ' selected' : '';
+                const hidden = isTerenHidden(id);
+                const cls = 'teren-item' + (nested ? ' subteren' : '') + (isArchived(f) ? ' archived' : '') + (hidden ? ' map-hidden' : '') + sel;
+                return '<div class="' + cls + '" data-id="' + escapeHtml(id) + '">' +
+                    '<div class="teren-item-actions">' +
+                    '<button class="action-btn hide' + (hidden ? ' is-hidden' : '') + '" data-id="' + escapeHtml(id) + '" title="' + (hidden ? 'Pokaż na mapie' : 'Ukryj na mapie') + '" type="button">' + (hidden ? '👁' : '⊘') + '</button>' +
+                    '<button class="action-btn edit" data-id="' + escapeHtml(id) + '" title="Edytuj" type="button">✎</button>' +
+                    '<button class="action-btn delete" data-id="' + escapeHtml(id) + '" title="Usuń" type="button">✕</button>' +
+                    '</div>' +
+                    '<strong>' + escapeHtml(id) + '. ' + escapeHtml(getFeatureTitle(f)) + '</strong>' +
+                    '<span class="teren-color-dot" style="background:' + col + '"></span>' +
+                    (assignee ? '<span class="badge ' + (meta.przypisany_typ === 'grupa' ? 'badge-group' : 'badge-brat') + '">' + escapeHtml(assignee) + '</span>' : '') +
+                    '<div class="teren-meta">' +
+                    (meta.data_przydzialu ? 'Przydział: ' + escapeHtml(meta.data_przydzialu) : 'Brak daty przydziału') +
+                    (lastComp ? ' · Oprac.: ' + escapeHtml(lastComp.date) : '') +
+                    (meta.ostatnie_opracowanie ? ' · Ostatnio zdany: ' + escapeHtml(meta.ostatnie_opracowanie) : '') +
+                    (hidden ? '<div class="teren-meta" style="color:#95a5a6">Ukryty na mapie (tylko lokalnie)</div>' : '') +
+                    '</div></div>';
+            }
+
+            function bindTerenActions(container) {
+                container.querySelectorAll('.action-btn.hide').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        e.stopPropagation();
+                        toggleTerenHidden(btn.dataset.id);
+                    });
+                });
+                container.querySelectorAll('.action-btn.edit').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        e.stopPropagation();
+                        openTerenEditor(btn.dataset.id);
+                    });
+                });
+                container.querySelectorAll('.action-btn.delete').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        e.stopPropagation();
+                        deleteTeren(btn.dataset.id);
+                    });
+                });
+            }
+
+            function openTerenEditor(id) {
+                isCreatingNewTeren = !id;
+                editingTerenId = id || null;
+                const idInput = document.getElementById('teren-editor-id');
+                const nameInput = document.getElementById('teren-editor-name');
+                const descInput = document.getElementById('teren-editor-desc');
+
+                if (id) {
+                    const f = database.features.find(t => String(getFeatureId(t)) === String(id));
+                    if (!f || isSubteren(f)) return;
+                    document.getElementById('teren-editor-title').textContent = 'Edycja terenu';
+                    idInput.value = id;
+                    idInput.readOnly = true;
+                    nameInput.value = getFeatureTitle(f);
+                    descInput.value = getFeatureDescription(f);
+                    loadPolygonToDraw(f);
+                } else {
+                    const nextId = getNextTerenId();
+                    document.getElementById('teren-editor-title').textContent = 'Nowy teren';
+                    idInput.value = nextId;
+                    idInput.readOnly = false;
+                    nameInput.value = 'Teren ' + nextId;
+                    descInput.value = '';
+                    drawnItems.clearLayers();
+                    currentPolygon = null;
+                }
+
+                selectedTerrainId = id ? String(id) : null;
+                drawContext = null;
+                setPanelView('teren-editor');
+                expandSheet();
+                updateTerenPolygonStatus();
+            }
+
+            async function saveTerenEditor() {
+                const id = document.getElementById('teren-editor-id').value.trim();
+                const name = document.getElementById('teren-editor-name').value.trim() || ('Teren ' + id);
+                const desc = document.getElementById('teren-editor-desc').value.trim();
+                if (!id) { alert('Podaj numer terenu.'); return; }
+                if (!currentPolygon) { alert('Narysuj granice terenu na mapie.'); return; }
+
+                const feature = buildTerenFeatureFromForm(id, name, desc);
+                if (!feature) return;
+
+                const existingIdx = database.features.findIndex(f => String(getFeatureId(f)) === String(id));
+                if (existingIdx !== -1 && String(editingTerenId) !== String(id)) {
+                    if (!confirm('Teren „' + id + '” już istnieje. Nadpisać?')) return;
+                    database.features.splice(existingIdx, 1);
+                } else if (existingIdx !== -1) {
+                    database.features.splice(existingIdx, 1);
+                }
+
+                database.features.push(feature);
+                sortFeatures();
+
+                const meta = getMeta(id);
+                meta.teren_nr = id;
+                meta.nazwa = name;
+                meta.parent_teren_nr = '';
+                terenyMeta[id] = meta;
+
+                setSaving(true, '⏳ Zapisuję teren…');
+                const wasNewTeren = isCreatingNewTeren;
+                try {
+                    const okGeo = await saveTereny({ skipUi: true });
+                    try { await saveTerenyMeta({ skipUi: true }); } catch (e) { console.warn(e); }
+
+                    editingTerenId = id;
+                    isCreatingNewTeren = false;
+                    selectedTerrainId = wasNewTeren ? null : String(id);
+                    renderTerenList();
+                    renderMap();
+                    if (wasNewTeren) setPanelView('tereny');
+                    else openTerenDetail(id);
+                    updateSyncStatus('synced');
+
+                    if (okGeo) alert('✅ Zapisano teren „' + name + '”');
+                } catch (e) {
+                    updateSyncStatus('error', '❌ ' + e.message);
+                    alert('❌ Zapis nie powiódł się:\n' + e.message);
+                } finally {
+                    setSaving(false);
+                }
+            }
+
+            async function deleteTeren(id) {
+                const f = database.features.find(t => String(getFeatureId(t)) === String(id));
+                if (!f) return;
+                const subs = isSubteren(f) ? [] : subterenyOf(id);
+                const msg = subs.length
+                    ? 'Usunąć teren „' + getFeatureTitle(f) + '” wraz z ' + subs.length + ' subterenami?'
+                    : 'Usunąć teren „' + getFeatureTitle(f) + '”?';
+                if (!confirm(msg)) return;
+
+                setSaving(true, '⏳ Usuwam teren…');
+                try {
+                    const removeIds = new Set([String(id), ...subs.map(s => String(getFeatureId(s)))]);
+                    database.features = database.features.filter(t => !removeIds.has(String(getFeatureId(t))));
+                    removeIds.forEach(rid => {
+                        delete metaById[rid];
+                        delete terenyMeta[rid];
+                        removeHiddenTeren(rid);
+                    });
+
+                    if (String(selectedTerrainId) === String(id)) {
+                        selectedTerrainId = null;
+                    }
+
+                    sortFeatures();
+                    await saveTereny({ skipUi: true });
+                    try { await saveTerenyMeta({ skipUi: true }); } catch (e) { console.warn(e); }
+                    setPanelView('tereny');
+                    renderTerenList();
+                    renderMap();
+                    updateSyncStatus('synced');
+                } catch (e) {
+                    updateSyncStatus('error', '❌ ' + e.message);
+                    alert('❌ Usuwanie nie powiodło się:\n' + e.message);
+                } finally {
+                    setSaving(false);
+                }
+            }
+
+            function openTerenDetail(id) {
+                selectedTerrainId = String(id);
+                const f = database.features.find(t => String(getFeatureId(t)) === String(id));
+                if (!f) return;
+                const meta = getMeta(id);
+                document.getElementById('detail-title').textContent = id + '. ' + getFeatureTitle(f);
+                const body = document.getElementById('teren-detail-body');
+                const comps = meta.completions || [];
+                const hasAssignee = !!(meta.przypisany_typ && meta.przypisany_id);
+                const hidden = isTerenHidden(id);
+                const desc = getFeatureDescription(f);
+                body.innerHTML =
+                    (hidden ? '<p style="font-size:12px;color:#7f8c8d;margin-bottom:10px;padding:8px 10px;background:#f4f6f7;border-radius:8px">Ten teren jest ukryty na mapie — tylko na tym urządzeniu, bez synchronizacji.</p>' : '') +
+                    (desc ? '<p style="margin-bottom:12px;color:#555"><strong>Opis:</strong> ' + escapeHtml(desc) + '</p>' : '') +
+                    '<p><strong>Przypisany:</strong> ' + (assigneeLabel(meta) || '—') + '</p>' +
+                    (hasAssignee ? '<button class="btn-sm btn-secondary" id="detail-unassign" type="button" style="margin-bottom:10px;background:#fdecea;color:#c0392b">✕ Usuń przydział</button>' : '') +
+                    '<label>Data przydziału</label>' +
+                    '<div class="date-row"><input type="date" id="detail-assigned-date" value="' + escapeHtml(meta.data_przydzialu || '') + '"' + (hasAssignee ? '' : ' disabled') + '>' +
+                    '<button class="btn-sm btn-secondary" id="detail-clear-assigned" type="button"' + (hasAssignee ? '' : ' disabled') + '>×</button></div>' +
+                    '<label>Opracowania (bieżący przydział)</label>' +
+                    '<div>' + (comps.length ? comps.map(c => '<span class="chip">' + escapeHtml(c.date) + (c.subterenId ? ' (' + escapeHtml(c.subterenId) + ')' : '') + '</span>').join('') : '<em>Brak</em>') + '</div>' +
+                    '<label>Data opracowania</label>' +
+                    '<div class="date-row"><input type="date" id="detail-complete-date" value="' + todayISO() + '">' +
+                    '<button class="btn-sm btn-secondary" id="detail-clear-complete" type="button">×</button></div>' +
+                    '<div class="teren-actions">' +
+                    '<button class="btn-sm btn-success" id="detail-assign" type="button">Przypisz</button>' +
+                    '<button class="btn-sm btn-warning" id="detail-complete" type="button">Opracowany</button>' +
+                    '<button class="btn-sm btn-primary" id="detail-zdaj" type="button">ZDANY</button>' +
+                    (!isSubteren(f) ? '<button class="btn-sm btn-secondary" id="detail-subteren" type="button">+ Subteren</button>' : '') +
+                    '<button class="btn-sm btn-secondary" id="detail-edit" type="button">✎ Edytuj</button>' +
+                    '<button class="btn-sm btn-secondary" id="detail-toggle-hide" type="button">' + (hidden ? '👁 Pokaż na mapie' : '⊘ Ukryj na mapie') + '</button>' +
+                    '<button class="btn-sm btn-secondary" id="detail-delete" type="button" style="background:#fdecea;color:#c0392b">Usuń</button>' +
+                    '</div>';
+
+                document.getElementById('detail-assign').onclick = () => openAssignModal(id);
+                document.getElementById('detail-unassign')?.addEventListener('click', () => openUnassignModal(id));
+                document.getElementById('detail-complete').onclick = async () => {
+                    const d = document.getElementById('detail-complete-date').value;
+                    const res = await postAction('complete', { terenId: id, date: d || todayISO(), subterenId: isSubteren(f) ? id : null });
+                    if (res) refreshAfterTerenMetaChange(id);
+                };
+                document.getElementById('detail-zdaj').onclick = async () => {
+                    if (!confirm('Oznaczyć teren jako ZDANY? Bieżący przydział zostanie zarchiwizowany.')) return;
+                    const res = await postAction('zdaj', { terenId: id });
+                    if (!res) return;
+                    archiveSubtereny(id);
+                    await saveTereny();
+                    refreshAfterTerenMetaChange(id);
+                };
+                document.getElementById('detail-subteren')?.addEventListener('click', () => startSubterenDraw(id));
+                document.getElementById('detail-edit').onclick = () => {
+                    if (isSubteren(f)) startSubterenDraw(getParentId(f), id);
+                    else openTerenEditor(id);
+                };
+                document.getElementById('detail-delete').onclick = () => deleteTeren(id);
+                document.getElementById('detail-toggle-hide').onclick = () => toggleTerenHidden(id);
+                document.getElementById('detail-clear-assigned').onclick = async () => {
+                    meta.data_przydzialu = '';
+                    await saveTerenyMeta();
+                    openTerenDetail(id);
+                };
+                document.getElementById('detail-assigned-date').onchange = async e => {
+                    meta.data_przydzialu = e.target.value || '';
+                    await saveTerenyMeta();
+                };
+                document.getElementById('detail-clear-complete').onclick = () => {
+                    document.getElementById('detail-complete-date').value = '';
+                };
+
+                setPanelView('teren-detail');
+                if (layerById[id]) map.fitBounds(layerById[id].getBounds(), { padding: [50, 50] });
+            }
+
+            function removeHiddenTeren(id) {
+                hiddenTereny.delete(String(id));
+                saveHiddenTereny();
+            }
+
+            function archiveSubtereny(parentId) {
+                database.features.forEach(f => {
+                    if (isSubteren(f) && String(getParentId(f)) === String(parentId)) {
+                        f.properties.archived = true;
+                    }
+                });
+                saveTereny();
+            }
+
+            function getNextSubterenId(parentId) {
+                const subs = database.features.filter(f =>
+                    isSubteren(f) && String(getParentId(f)) === String(parentId)
+                );
+                const letters = subs.map(f => {
+                    const m = String(getFeatureId(f)).match(new RegExp('^' + parentId + '([a-z])', 'i'));
+                    return m ? m[1].toLowerCase() : '';
+                }).filter(Boolean);
+                let next = 'a';
+                while (letters.includes(next)) next = String.fromCharCode(next.charCodeAt(0) + 1);
+                return parentId + next;
+            }
+
+            function startSubterenDraw(parentId, subterenId) {
+                drawParentId = parentId;
+                drawContext = 'subteren';
+                const idInput = document.getElementById('subteren-id');
+                idInput.readOnly = !!subterenId;
+
+                if (subterenId) {
+                    const f = database.features.find(t => String(getFeatureId(t)) === String(subterenId));
+                    idInput.value = subterenId;
+                    document.getElementById('subteren-name').value = f ? getFeatureTitle(f) : ('Subteren ' + subterenId);
+                    loadPolygonToDraw(f);
+                } else {
+                    idInput.value = getNextSubterenId(parentId);
+                    document.getElementById('subteren-name').value = 'Subteren ' + parentId;
+                    drawnItems.clearLayers();
+                    currentPolygon = null;
+                }
+
+                const parent = database.features.find(f => String(getFeatureId(f)) === String(parentId));
+                if (parent) map.fitBounds(L.polygon(polygonLatLngs(parent)).getBounds(), { padding: [40, 40] });
+                setPanelView('draw');
+                if (!window.matchMedia('(min-width:768px)').matches) collapseSheet();
+            }
+
+            async function saveSubteren() {
+                const id = document.getElementById('subteren-id').value.trim();
+                const name = document.getElementById('subteren-name').value.trim() || ('Subteren ' + id);
+                if (!id || !drawParentId || !currentPolygon) { alert('Podaj ID i narysuj polygon.'); return; }
+
+                const latlngs = currentPolygon.getLatLngs()[0];
+                const coordinates = latlngs.map(ll => [
+                    parseFloat(ll.lng.toFixed(CONFIG.COORD_PRECISION)),
+                    parseFloat(ll.lat.toFixed(CONFIG.COORD_PRECISION))
+                ]);
+                const first = coordinates[0], last = coordinates[coordinates.length - 1];
+                if (first[0] !== last[0] || first[1] !== last[1]) coordinates.push([first[0], first[1]]);
+
+                const parentMeta = getMeta(drawParentId);
+                const feature = {
+                    type: 'Feature', id: id,
+                    geometry: { type: 'Polygon', coordinates: [coordinates] },
+                    properties: {
+                        id: id, title: name, name: name,
+                        parentId: String(drawParentId), isSubteren: true,
+                        created: new Date().toISOString()
+                    }
+                };
+
+                const idx = database.features.findIndex(f => String(getFeatureId(f)) === id);
+                if (idx >= 0) database.features.splice(idx, 1);
+                database.features.push(feature);
+
+                const subMeta = getMeta(id);
+                subMeta.teren_nr = id;
+                subMeta.nazwa = name;
+                subMeta.parent_teren_nr = String(drawParentId);
+                if (parentMeta.przypisany_typ) {
+                    subMeta.przypisany_typ = parentMeta.przypisany_typ;
+                    subMeta.przypisany_id = parentMeta.przypisany_id;
+                    subMeta.data_przydzialu = parentMeta.data_przydzialu || todayISO();
                 }
 
                 sortFeatures();
-                await saveTereny({ skipUi: true });
-                try { await saveTerenyMeta({ skipUi: true }); } catch (e) { console.warn(e); }
-                setPanelView('tereny');
-                renderTerenList();
-                renderMap();
-                updateSyncStatus('synced');
-            } catch (e) {
-                updateSyncStatus('error', '❌ ' + e.message);
-                alert('❌ Usuwanie nie powiodło się:\n' + e.message);
-            } finally {
-                setSaving(false);
-            }
-        }
-
-        function openTerenDetail(id) {
-            selectedTerrainId = String(id);
-            const f = database.features.find(t => String(getFeatureId(t)) === String(id));
-            if (!f) return;
-            const meta = getMeta(id);
-            document.getElementById('detail-title').textContent = id + '. ' + getFeatureTitle(f);
-            const body = document.getElementById('teren-detail-body');
-            const comps = meta.completions || [];
-            const hasAssignee = !!(meta.przypisany_typ && meta.przypisany_id);
-            body.innerHTML =
-                '<p><strong>Przypisany:</strong> ' + (assigneeLabel(meta) || '—') + '</p>' +
-                (hasAssignee ? '<button class="btn-sm btn-secondary" id="detail-unassign" type="button" style="margin-bottom:10px;background:#fdecea;color:#c0392b">✕ Usuń przydział</button>' : '') +
-                '<label>Data przydziału</label>' +
-                '<div class="date-row"><input type="date" id="detail-assigned-date" value="' + escapeHtml(meta.data_przydzialu || '') + '"' + (hasAssignee ? '' : ' disabled') + '>' +
-                '<button class="btn-sm btn-secondary" id="detail-clear-assigned" type="button"' + (hasAssignee ? '' : ' disabled') + '>×</button></div>' +
-                '<label>Opracowania (bieżący przydział)</label>' +
-                '<div>' + (comps.length ? comps.map(c => '<span class="chip">' + escapeHtml(c.date) + (c.subterenId ? ' (' + escapeHtml(c.subterenId) + ')' : '') + '</span>').join('') : '<em>Brak</em>') + '</div>' +
-                '<label>Data opracowania</label>' +
-                '<div class="date-row"><input type="date" id="detail-complete-date" value="' + todayISO() + '">' +
-                '<button class="btn-sm btn-secondary" id="detail-clear-complete" type="button">×</button></div>' +
-                '<div class="teren-actions">' +
-                '<button class="btn-sm btn-success" id="detail-assign" type="button">Przypisz</button>' +
-                '<button class="btn-sm btn-warning" id="detail-complete" type="button">Opracowany</button>' +
-                '<button class="btn-sm btn-primary" id="detail-zdaj" type="button">ZDANY</button>' +
-                (!isSubteren(f) ? '<button class="btn-sm btn-secondary" id="detail-subteren" type="button">+ Subteren</button>' : '') +
-                '<button class="btn-sm btn-secondary" id="detail-edit" type="button">✎ Edytuj</button>' +
-                '<button class="btn-sm btn-secondary" id="detail-delete" type="button" style="background:#fdecea;color:#c0392b">Usuń</button>' +
-                '</div>';
-
-            document.getElementById('detail-assign').onclick = () => openAssignModal(id);
-            document.getElementById('detail-unassign')?.addEventListener('click', () => openUnassignModal(id));
-            document.getElementById('detail-complete').onclick = async () => {
-                const d = document.getElementById('detail-complete-date').value;
-                await postAction('complete', { terenId: id, date: d || todayISO(), subterenId: isSubteren(f) ? id : null });
-                openTerenDetail(id);
-                renderTerenList();
-                renderMap();
-            };
-            document.getElementById('detail-zdaj').onclick = async () => {
-                if (!confirm('Oznaczyć teren jako ZDANY? Bieżący przydział zostanie zarchiwizowany.')) return;
-                await postAction('zdaj', { terenId: id });
-                archiveSubtereny(id);
                 await saveTereny();
                 await saveTerenyMeta();
-                openTerenDetail(id);
+                openTerenDetail(drawParentId);
+            }
+
+            // ── Assign modal ────────────────────────────────────────────────────
+            function populateAssignTerenSelect(selectedId) {
+                const sel = document.getElementById('assign-teren');
+                sel.innerHTML = '';
+                parentFeatures().forEach(f => {
+                    const id = getFeatureId(f);
+                    const o = document.createElement('option');
+                    o.value = id;
+                    o.textContent = id + '. ' + getFeatureTitle(f);
+                    if (selectedId && String(id) === String(selectedId)) o.selected = true;
+                    sel.appendChild(o);
+                });
+            }
+
+            function openUnassignModal(terenId) {
+                const meta = getMeta(terenId);
+                if (!meta.przypisany_typ || !meta.przypisany_id) {
+                    alert('Ten teren nie ma aktywnego przydziału.');
+                    return;
+                }
+
+                const comps = meta.completions || [];
+                const who = assigneeLabel(meta) || 'przypisaną osobę';
+
+                if (!comps.length) {
+                    if (!confirm('Usunąć przydział: ' + who + '?')) return;
+                    confirmUnassign(terenId, false);
+                    return;
+                }
+
+                unassignTerenId = terenId;
+                document.getElementById('unassign-modal-text').innerHTML =
+                    'Usunąć przydział dla: <strong>' + escapeHtml(who) + '</strong>?<br>' +
+                    'Zapisanych opracowań w tym przydziale: ' + comps.length + '.';
+                document.getElementById('unassign-modal').classList.add('open');
+            }
+
+            async function confirmUnassign(terenId, clearHistory) {
+                document.getElementById('unassign-modal').classList.remove('open');
+                unassignTerenId = null;
+                await clearTerenAssignment(terenId, clearHistory);
+            }
+
+            function openAssignModal(terenId, options) {
+                options = options || {};
+                assignTerenId = terenId || null;
+                populateAssignTerenSelect(terenId);
+                document.getElementById('assign-modal-title').textContent =
+                    terenId ? ('Przypisz teren ' + terenId) : 'Przypisz teren';
+                document.getElementById('assign-date').value = todayISO();
+                if (options.type) document.getElementById('assign-type').value = options.type;
+                updateAssignTargets();
+                if (options.targetId) document.getElementById('assign-target').value = options.targetId;
+                document.getElementById('assign-modal').classList.add('open');
+            }
+
+            function updateAssignTargets() {
+                const type = document.getElementById('assign-type').value;
+                const sel = document.getElementById('assign-target');
+                sel.innerHTML = '';
+                if (type === 'brat') {
+                    bracia.forEach(b => {
+                        const o = document.createElement('option');
+                        o.value = b.id; o.textContent = bratLabel(b);
+                        sel.appendChild(o);
+                    });
+                } else {
+                    grupy.forEach(g => {
+                        const o = document.createElement('option');
+                        o.value = g.id; o.textContent = g.name || g.id;
+                        sel.appendChild(o);
+                    });
+                }
+            }
+
+            function openGrupaModal() {
+                document.getElementById('grupa-new-name').value = suggestNextGrupaName();
+                document.getElementById('grupa-modal').classList.add('open');
+            }
+
+            async function createGrupa() {
+                let name = document.getElementById('grupa-new-name').value.trim();
+                if (!name) { alert('Podaj nazwę zakładki.'); return; }
+                if (!/^Grupa\s+/i.test(name)) name = 'Grupa ' + name;
+
+                setSaving(true);
+                try {
+                    const res = await apiPost({ action: 'create-grupa', name: name });
+                    if (res.error) throw new Error(res.error);
+
+                    grupy.push({ id: res.name, name: res.name });
+                    grupy.sort((a, b) => a.name.localeCompare(b.name, 'pl', { numeric: true }));
+                    grupaData[res.name] = { id: res.name, name: res.name, members: [], assignments: [] };
+
+                    try {
+                        grupaData[res.name] = await apiGet('grupa', { name: res.name });
+                    } catch (e) { console.warn(e); }
+
+                    saveBundleLocal();
+                    document.getElementById('grupa-modal').classList.remove('open');
+                    updateSyncStatus('synced');
+                    renderGrupyList();
+                    showGrupaDetail(res.name);
+                } catch (e) {
+                    updateSyncStatus('error', '❌ ' + e.message);
+                    alert('Nie udało się utworzyć grupy: ' + e.message);
+                } finally {
+                    setSaving(false);
+                }
+            }
+
+            async function confirmAssign() {
+                const terenId = document.getElementById('assign-teren').value || assignTerenId;
+                if (!terenId) { alert('Wybierz teren.'); return; }
+                const type = document.getElementById('assign-type').value;
+                const id = document.getElementById('assign-target').value;
+                const date = document.getElementById('assign-date').value;
+                const f = database.features.find(t => String(getFeatureId(t)) === String(terenId));
+                const res = await postAction('assign', {
+                    terenId: terenId, type: type, id: id,
+                    assignedDate: date || null,
+                    nazwa: f ? getFeatureTitle(f) : ''
+                });
+                if (!res) return;
+                assignTerenId = terenId;
+                document.getElementById('assign-modal').classList.remove('open');
+                refreshAfterTerenMetaChange(
+                    panelView === 'teren-detail' ? selectedTerrainId : terenId
+                );
+            }
+
+            function openBratDetail(bratId) {
+                selectedBratId = String(bratId);
+                const b = bracia.find(x => String(x.id) === String(bratId));
+                if (!b) return;
+
+                document.getElementById('brat-detail-title').textContent = bratLabel(b);
+                const assigned = terenyForBrat(bratId);
+                const body = document.getElementById('brat-detail-body');
+
+                let html = '';
+                if (b.grupa_id) {
+                    html += '<p style="margin-bottom:12px"><strong>Grupa:</strong> ' + escapeHtml(grupaLabel(b.grupa_id)) + '</p>';
+                }
+
+                html += '<label>Przypisane tereny (' + assigned.length + ')</label>';
+                if (!assigned.length) {
+                    html += '<p style="margin:8px 0 12px"><em>Brak przypisanych terenów</em></p>';
+                } else {
+                    assigned.forEach(m => {
+                        const f = database.features.find(t => String(getFeatureId(t)) === String(m.teren_nr));
+                        const title = f ? getFeatureTitle(f) : (m.nazwa || '');
+                        const comps = m.completions || [];
+                        html += '<div class="brat-teren-block">' +
+                            '<a href="#" class="brat-teren-link" data-teren="' + escapeHtml(m.teren_nr) + '">' +
+                            escapeHtml(m.teren_nr) + '. ' + escapeHtml(title) + '</a>' +
+                            '<div class="teren-meta" style="margin-top:6px">Data przydziału: ' + escapeHtml(m.data_przydzialu || '—') + '</div>';
+                        if (m.ostatnie_opracowanie) {
+                            html += '<div class="teren-meta">Ostatnio zdany: ' + escapeHtml(m.ostatnie_opracowanie) + '</div>';
+                        }
+                        html += '<div style="margin-top:6px;font-size:12px;color:#666">Bieżące opracowania:</div>' +
+                            '<div style="margin-top:4px">' +
+                            (comps.length
+                                ? comps.map(c => '<span class="chip">' + escapeHtml(c.date) +
+                                    (c.subterenId ? ' (' + escapeHtml(c.subterenId) + ')' : '') + '</span>').join('')
+                                : '<em style="font-size:12px;color:#888">Brak</em>') +
+                            '</div></div>';
+                    });
+                }
+
+                html += '<button class="btn-sm btn-success" id="brat-detail-assign" type="button" style="margin-top:12px">Przypisz teren</button>';
+                body.innerHTML = html;
+
+                body.querySelectorAll('.brat-teren-link').forEach(link => {
+                    link.onclick = e => {
+                        e.preventDefault();
+                        openTerenDetail(link.dataset.teren);
+                    };
+                });
+                document.getElementById('brat-detail-assign').onclick = () => {
+                    openAssignModal(null, { type: 'brat', targetId: bratId });
+                };
+
+                setPanelView('brat-detail');
+            }
+
+            // ── Bracia ──────────────────────────────────────────────────────────
+            function renderBraciaList() {
+                const list = document.getElementById('bracia-list');
+                if (!bracia.length) {
+                    list.innerHTML = '<p class="list-empty">Brak braci — dodaj pierwszego</p>';
+                    return;
+                }
+                list.innerHTML = bracia.map(b => {
+                    const assigned = terenyForBrat(b.id);
+                    const chips = assigned.map(m => '<span class="chip" data-teren="' + escapeHtml(m.teren_nr) + '">' + escapeHtml(m.teren_nr) + '</span>').join('');
+                    const grupaOpts = grupy.map(g =>
+                        '<option value="' + escapeHtml(g.id) + '"' +
+                        (normalizeGrupaId(b.grupa_id) === normalizeGrupaId(g.id) ? ' selected' : '') +
+                        '>' + escapeHtml(g.name) + '</option>'
+                    ).join('');
+                    return '<div class="person-item' + (selectedBratId === String(b.id) ? ' selected' : '') + '" data-id="' + escapeHtml(b.id) + '">' +
+                        '<strong>' + escapeHtml(bratLabel(b)) + '</strong>' +
+                        '<div style="margin-top:6px"><select class="brat-grupa-select" data-id="' + escapeHtml(b.id) + '">' +
+                        '<option value="">— brak grupy —</option>' + grupaOpts + '</select></div>' +
+                        '<div style="margin-top:6px">' + (chips || '<em style="font-size:12px;color:#888">Brak terenów</em>') + '</div>' +
+                        '<div class="teren-actions"><button class="btn-sm btn-success brat-assign" data-id="' + escapeHtml(b.id) + '" type="button">Przypisz teren</button>' +
+                        '<button class="btn-sm btn-secondary brat-delete" data-id="' + escapeHtml(b.id) + '" type="button">Usuń</button></div></div>';
+                }).join('');
+
+                list.querySelectorAll('.person-item').forEach(item => {
+                    item.addEventListener('click', e => {
+                        if (e.target.closest('button, select, .chip')) return;
+                        openBratDetail(item.dataset.id);
+                    });
+                });
+                list.querySelectorAll('.brat-grupa-select').forEach(sel => {
+                    sel.onchange = async () => {
+                        const b = bracia.find(x => String(x.id) === sel.dataset.id);
+                        if (b) { b.grupa_id = sel.value; await saveBracia(); }
+                    };
+                });
+                list.querySelectorAll('.brat-assign').forEach(btn => {
+                    btn.onclick = () => {
+                        openAssignModal(null, { type: 'brat', targetId: btn.dataset.id });
+                    };
+                });
+                list.querySelectorAll('.brat-delete').forEach(btn => {
+                    btn.onclick = async () => {
+                        if (!confirm('Usunąć brata?')) return;
+                        bracia = bracia.filter(b => String(b.id) !== btn.dataset.id);
+                        await saveBracia();
+                        renderBraciaList();
+                    };
+                });
+                list.querySelectorAll('.chip[data-teren]').forEach(chip => {
+                    chip.style.cursor = 'pointer';
+                    chip.onclick = () => openTerenDetail(chip.dataset.teren);
+                });
+            }
+
+            document.getElementById('btn-add-brat').onclick = async () => {
+                const imie = prompt('Imię:');
+                if (!imie) return;
+                const nazwisko = prompt('Nazwisko:') || '';
+                const maxId = bracia.reduce((m, b) => Math.max(m, parseInt(b.id, 10) || 0), 0);
+                bracia.push({ id: String(maxId + 1), imie, nazwisko, grupa_id: '' });
+                await saveBracia();
+                renderBraciaList();
+            };
+
+            // ── Grupy ───────────────────────────────────────────────────────────
+            function renderGrupyList() {
+                const list = document.getElementById('grupy-list');
+                if (!grupy.length) {
+                    list.innerHTML = '<p class="list-empty">Brak grup w arkuszu (zakładki „Grupa 1”, „Grupa 2”…)</p>';
+                    return;
+                }
+                list.innerHTML = grupy.map(g => {
+                    const cnt = (grupaData[g.id]?.members || []).length;
+                    const tCnt = terenyForGrupa(g.id).length;
+                    return '<div class="group-item" data-id="' + escapeHtml(g.id) + '">' +
+                        '<strong>' + escapeHtml(g.name || ('Grupa ' + g.id)) + '</strong>' +
+                        '<div class="teren-meta">' + cnt + ' członków · ' + tCnt + ' terenów</div></div>';
+                }).join('');
+
+                list.querySelectorAll('.group-item').forEach(item => {
+                    item.onclick = () => showGrupaDetail(item.dataset.id);
+                });
+            }
+
+            function showGrupaDetail(id) {
+                const g = grupaData[id] || { id, members: [], assignments: [] };
+                const detail = document.getElementById('grupa-detail');
+                detail.style.display = 'block';
+                const tereny = terenyForGrupa(id);
+                detail.innerHTML =
+                    '<h3 style="font-size:15px;margin-bottom:8px">' + escapeHtml(grupaLabel(id)) + '</h3>' +
+                    '<label>Członkowie</label>' +
+                    '<div>' + (g.members.length ? g.members.map(m =>
+                        '<span class="chip">' + escapeHtml((m.imie || '') + ' ' + (m.nazwisko || '')) + '</span>'
+                    ).join('') : '<em>Brak — zsynchronizuj z arkuszem</em>') + '</div>' +
+                    '<label>Przypisane tereny</label>' +
+                    '<div>' + (tereny.length ? tereny.map(m =>
+                        '<span class="chip grupa-teren" data-teren="' + escapeHtml(m.teren_nr) + '">' + escapeHtml(m.teren_nr) + '</span>'
+                    ).join('') : '<em>Brak</em>') + '</div>' +
+                    '<button class="btn-sm btn-success" id="grupa-assign-btn" type="button" style="margin-top:8px">Przypisz teren do grupy</button>';
+
+                document.getElementById('grupa-assign-btn').onclick = () => {
+                    openAssignModal(null, { type: 'grupa', targetId: id });
+                };
+                detail.querySelectorAll('.grupa-teren').forEach(chip => {
+                    chip.style.cursor = 'pointer';
+                    chip.onclick = () => openTerenDetail(chip.dataset.teren);
+                });
+            }
+
+            // ── Filters ─────────────────────────────────────────────────────────
+            function updateFilterValueOptions() {
+                const type = document.getElementById('filter-type').value;
+                const sel = document.getElementById('filter-value');
+                filterType = type;
+                if (!type) { sel.style.display = 'none'; filterValue = ''; renderTerenList(); renderMap(); return; }
+                sel.style.display = 'block';
+                sel.innerHTML = '';
+                if (type === 'grupa') {
+                    grupy.forEach(g => {
+                        const o = document.createElement('option');
+                        o.value = g.id; o.textContent = g.name || ('Grupa ' + g.id);
+                        sel.appendChild(o);
+                    });
+                    filterValue = grupy[0]?.id || '';
+                } else {
+                    bracia.forEach(b => {
+                        const o = document.createElement('option');
+                        o.value = b.id; o.textContent = bratLabel(b);
+                        sel.appendChild(o);
+                    });
+                    filterValue = bracia[0]?.id || '';
+                }
+                sel.value = filterValue;
                 renderTerenList();
                 renderMap();
-            };
-            document.getElementById('detail-subteren')?.addEventListener('click', () => startSubterenDraw(id));
-            document.getElementById('detail-edit').onclick = () => {
-                if (isSubteren(f)) startSubterenDraw(getParentId(f), id);
-                else openTerenEditor(id);
-            };
-            document.getElementById('detail-delete').onclick = () => deleteTeren(id);
-            document.getElementById('detail-clear-assigned').onclick = async () => {
-                meta.data_przydzialu = '';
-                await saveTerenyMeta();
-                openTerenDetail(id);
-            };
-            document.getElementById('detail-assigned-date').onchange = async e => {
-                meta.data_przydzialu = e.target.value || '';
-                await saveTerenyMeta();
-            };
-            document.getElementById('detail-clear-complete').onclick = () => {
-                document.getElementById('detail-complete-date').value = '';
-            };
+            }
 
-            setPanelView('teren-detail');
-            if (layerById[id]) map.fitBounds(layerById[id].getBounds(), { padding: [50, 50] });
-        }
+            // ── Bottom sheet ────────────────────────────────────────────────────
+            function measureSheet() { sheetHeight = panelSheet.offsetHeight; }
+            function setSheetTranslate(px) {
+                const max = Math.max(0, sheetHeight - SHEET_COLLAPSED);
+                return panelSheet.style.transform = 'translateY(' + Math.max(0, Math.min(max, px)) + 'px)';
+            }
+            function expandSheet() { sheetExpanded = true; measureSheet(); setSheetTranslate(0); }
+            function collapseSheet() { sheetExpanded = false; measureSheet(); setSheetTranslate(sheetHeight - SHEET_COLLAPSED); }
 
-        function archiveSubtereny(parentId) {
-            database.features.forEach(f => {
-                if (isSubteren(f) && String(getParentId(f)) === String(parentId)) {
-                    f.properties.archived = true;
-                }
-            });
-            saveTereny();
-        }
+            function initBottomSheet() {
+                if (window.matchMedia('(min-width:768px)').matches) return;
+                measureSheet(); collapseSheet();
+                sheetHandle.addEventListener('pointerdown', e => {
+                    isDragging = true; dragMoved = false;
+                    dragStartY = e.clientY;
+                    const m = panelSheet.style.transform.match(/translateY\(([-\d.]+)px\)/);
+                    dragStartTranslate = m ? parseFloat(m[1]) : 0;
+                    sheetHandle.setPointerCapture(e.pointerId);
+                });
+                sheetHandle.addEventListener('pointermove', e => {
+                    if (!isDragging) return;
+                    if (Math.abs(e.clientY - dragStartY) > 4) dragMoved = true;
+                    setSheetTranslate(dragStartTranslate + (e.clientY - dragStartY));
+                });
+                sheetHandle.addEventListener('pointerup', e => {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    sheetHandle.releasePointerCapture(e.pointerId);
+                    const m = panelSheet.style.transform.match(/translateY\(([-\d.]+)px\)/);
+                    const t = m ? parseFloat(m[1]) : 0;
+                    (t < (sheetHeight - SHEET_COLLAPSED) * 0.4) ? expandSheet() : collapseSheet();
+                });
+                sheetHandle.addEventListener('click', () => {
+                    if (dragMoved) return;
+                    sheetExpanded ? collapseSheet() : expandSheet();
+                });
+            }
 
-        function getNextSubterenId(parentId) {
-            const subs = database.features.filter(f =>
-                isSubteren(f) && String(getParentId(f)) === String(parentId)
-            );
-            const letters = subs.map(f => {
-                const m = String(getFeatureId(f)).match(new RegExp('^' + parentId + '([a-z])', 'i'));
-                return m ? m[1].toLowerCase() : '';
-            }).filter(Boolean);
-            let next = 'a';
-            while (letters.includes(next)) next = String.fromCharCode(next.charCodeAt(0) + 1);
-            return parentId + next;
-        }
-
-        function startSubterenDraw(parentId, subterenId) {
-            drawParentId = parentId;
-            const idInput = document.getElementById('subteren-id');
-            idInput.readOnly = !!subterenId;
-
-            if (subterenId) {
-                const f = database.features.find(t => String(getFeatureId(t)) === String(subterenId));
-                idInput.value = subterenId;
-                document.getElementById('subteren-name').value = f ? getFeatureTitle(f) : ('Subteren ' + subterenId);
-                loadPolygonToDraw(f);
-            } else {
-                idInput.value = getNextSubterenId(parentId);
-                document.getElementById('subteren-name').value = 'Subteren ' + parentId;
+            // ── Events ──────────────────────────────────────────────────────────
+            document.querySelectorAll('.nav-tab').forEach(btn => btn.onclick = () => setTab(btn.dataset.tab));
+            document.getElementById('btn-back-tereny').onclick = () => setPanelView('tereny');
+            document.getElementById('btn-back-bracia').onclick = () => {
+                selectedBratId = null;
+                setPanelView('bracia');
+            };
+            document.getElementById('btn-back-editor').onclick = () => {
+                if (editingTerenId) openTerenDetail(editingTerenId);
+                else setPanelView('tereny');
+            };
+            document.getElementById('btn-back-teren-draw').onclick = () => backFromTerenDraw();
+            document.getElementById('btn-go-teren-draw').onclick = () => openTerenDrawMode();
+            document.getElementById('btn-finish-teren-draw').onclick = () => finishTerenDrawMode();
+            document.getElementById('btn-clear-teren-polygon').onclick = () => {
                 drawnItems.clearLayers();
                 currentPolygon = null;
-            }
-
-            const parent = database.features.find(f => String(getFeatureId(f)) === String(parentId));
-            if (parent) map.fitBounds(L.polygon(polygonLatLngs(parent)).getBounds(), { padding: [40, 40] });
-            setPanelView('draw');
-        }
-
-        async function saveSubteren() {
-            const id = document.getElementById('subteren-id').value.trim();
-            const name = document.getElementById('subteren-name').value.trim() || ('Subteren ' + id);
-            if (!id || !drawParentId || !currentPolygon) { alert('Podaj ID i narysuj polygon.'); return; }
-
-            const latlngs = currentPolygon.getLatLngs()[0];
-            const coordinates = latlngs.map(ll => [
-                parseFloat(ll.lng.toFixed(CONFIG.COORD_PRECISION)),
-                parseFloat(ll.lat.toFixed(CONFIG.COORD_PRECISION))
-            ]);
-            const first = coordinates[0], last = coordinates[coordinates.length - 1];
-            if (first[0] !== last[0] || first[1] !== last[1]) coordinates.push([first[0], first[1]]);
-
-            const parentMeta = getMeta(drawParentId);
-            const feature = {
-                type: 'Feature', id: id,
-                geometry: { type: 'Polygon', coordinates: [coordinates] },
-                properties: {
-                    id: id, title: name, name: name,
-                    parentId: String(drawParentId), isSubteren: true,
-                    created: new Date().toISOString()
-                }
+                updateTerenPolygonStatus();
             };
-
-            const idx = database.features.findIndex(f => String(getFeatureId(f)) === id);
-            if (idx >= 0) database.features.splice(idx, 1);
-            database.features.push(feature);
-
-            const subMeta = getMeta(id);
-            subMeta.teren_nr = id;
-            subMeta.nazwa = name;
-            subMeta.parent_teren_nr = String(drawParentId);
-            if (parentMeta.przypisany_typ) {
-                subMeta.przypisany_typ = parentMeta.przypisany_typ;
-                subMeta.przypisany_id = parentMeta.przypisany_id;
-                subMeta.data_przydzialu = parentMeta.data_przydzialu || todayISO();
-            }
-
-            sortFeatures();
-            await saveTereny();
-            await saveTerenyMeta();
-            openTerenDetail(drawParentId);
-        }
-
-        // ── Assign modal ────────────────────────────────────────────────────
-        function populateAssignTerenSelect(selectedId) {
-            const sel = document.getElementById('assign-teren');
-            sel.innerHTML = '';
-            parentFeatures().forEach(f => {
-                const id = getFeatureId(f);
-                const o = document.createElement('option');
-                o.value = id;
-                o.textContent = id + '. ' + getFeatureTitle(f);
-                if (selectedId && String(id) === String(selectedId)) o.selected = true;
-                sel.appendChild(o);
-            });
-        }
-
-        function openUnassignModal(terenId) {
-            const meta = getMeta(terenId);
-            if (!meta.przypisany_typ || !meta.przypisany_id) {
-                alert('Ten teren nie ma aktywnego przydziału.');
-                return;
-            }
-
-            const comps = meta.completions || [];
-            const who = assigneeLabel(meta) || 'przypisaną osobę';
-
-            if (!comps.length) {
-                if (!confirm('Usunąć przydział: ' + who + '?')) return;
-                confirmUnassign(terenId, false);
-                return;
-            }
-
-            unassignTerenId = terenId;
-            document.getElementById('unassign-modal-text').innerHTML =
-                'Usunąć przydział dla: <strong>' + escapeHtml(who) + '</strong>?<br>' +
-                'Zapisanych opracowań w tym przydziale: ' + comps.length + '.';
-            document.getElementById('unassign-modal').classList.add('open');
-        }
-
-        async function confirmUnassign(terenId, clearHistory) {
-            document.getElementById('unassign-modal').classList.remove('open');
-            unassignTerenId = null;
-
-            const res = await postAction('unassign', { terenId: terenId, clearHistory: !!clearHistory });
-            if (!res) return;
-
-            openTerenDetail(terenId);
-            renderTerenList();
-            renderMap();
-        }
-
-        function openAssignModal(terenId, options) {
-            options = options || {};
-            assignTerenId = terenId || null;
-            populateAssignTerenSelect(terenId);
-            document.getElementById('assign-modal-title').textContent =
-                terenId ? ('Przypisz teren ' + terenId) : 'Przypisz teren';
-            document.getElementById('assign-date').value = todayISO();
-            if (options.type) document.getElementById('assign-type').value = options.type;
-            updateAssignTargets();
-            if (options.targetId) document.getElementById('assign-target').value = options.targetId;
-            document.getElementById('assign-modal').classList.add('open');
-        }
-
-        function updateAssignTargets() {
-            const type = document.getElementById('assign-type').value;
-            const sel = document.getElementById('assign-target');
-            sel.innerHTML = '';
-            if (type === 'brat') {
-                bracia.forEach(b => {
-                    const o = document.createElement('option');
-                    o.value = b.id; o.textContent = bratLabel(b);
-                    sel.appendChild(o);
-                });
-            } else {
-                grupy.forEach(g => {
-                    const o = document.createElement('option');
-                    o.value = g.id; o.textContent = g.name || g.id;
-                    sel.appendChild(o);
-                });
-            }
-        }
-
-        function openGrupaModal() {
-            document.getElementById('grupa-new-name').value = suggestNextGrupaName();
-            document.getElementById('grupa-modal').classList.add('open');
-        }
-
-        async function createGrupa() {
-            let name = document.getElementById('grupa-new-name').value.trim();
-            if (!name) { alert('Podaj nazwę zakładki.'); return; }
-            if (!/^Grupa\s+/i.test(name)) name = 'Grupa ' + name;
-
-            setSaving(true);
-            try {
-                const res = await apiPost({ action: 'create-grupa', name: name });
-                if (res.error) throw new Error(res.error);
-
-                grupy.push({ id: res.name, name: res.name });
-                grupy.sort((a, b) => a.name.localeCompare(b.name, 'pl', { numeric: true }));
-                grupaData[res.name] = { id: res.name, name: res.name, members: [], assignments: [] };
-
-                try {
-                    grupaData[res.name] = await apiGet('grupa', { name: res.name });
-                } catch (e) { console.warn(e); }
-
-                saveBundleLocal();
-                document.getElementById('grupa-modal').classList.remove('open');
-                updateSyncStatus('synced');
-                renderGrupyList();
-                showGrupaDetail(res.name);
-            } catch (e) {
-                updateSyncStatus('error', '❌ ' + e.message);
-                alert('Nie udało się utworzyć grupy: ' + e.message);
-            } finally {
-                setSaving(false);
-            }
-        }
-
-        async function confirmAssign() {
-            const terenId = document.getElementById('assign-teren').value || assignTerenId;
-            if (!terenId) { alert('Wybierz teren.'); return; }
-            const type = document.getElementById('assign-type').value;
-            const id = document.getElementById('assign-target').value;
-            const date = document.getElementById('assign-date').value;
-            const f = database.features.find(t => String(getFeatureId(t)) === String(terenId));
-            await postAction('assign', {
-                terenId: terenId, type: type, id: id,
-                assignedDate: date || null,
-                nazwa: f ? getFeatureTitle(f) : ''
-            });
-            assignTerenId = terenId;
-            document.getElementById('assign-modal').classList.remove('open');
-            if (selectedTerrainId) openTerenDetail(selectedTerrainId);
-            renderTerenList();
-            renderMap();
-        }
-
-        // ── Bracia ──────────────────────────────────────────────────────────
-        function renderBraciaList() {
-            const list = document.getElementById('bracia-list');
-            if (!bracia.length) {
-                list.innerHTML = '<p class="list-empty">Brak braci — dodaj pierwszego</p>';
-                return;
-            }
-            list.innerHTML = bracia.map(b => {
-                const assigned = terenyForBrat(b.id);
-                const chips = assigned.map(m => '<span class="chip" data-teren="' + escapeHtml(m.teren_nr) + '">' + escapeHtml(m.teren_nr) + '</span>').join('');
-                const grupaOpts = grupy.map(g =>
-                    '<option value="' + escapeHtml(g.id) + '"' +
-                    (normalizeGrupaId(b.grupa_id) === normalizeGrupaId(g.id) ? ' selected' : '') +
-                    '>' + escapeHtml(g.name) + '</option>'
-                ).join('');
-                return '<div class="person-item" data-id="' + escapeHtml(b.id) + '">' +
-                    '<strong>' + escapeHtml(bratLabel(b)) + '</strong>' +
-                    '<div style="margin-top:6px"><select class="brat-grupa-select" data-id="' + escapeHtml(b.id) + '">' +
-                    '<option value="">— brak grupy —</option>' + grupaOpts + '</select></div>' +
-                    '<div style="margin-top:6px">' + (chips || '<em style="font-size:12px;color:#888">Brak terenów</em>') + '</div>' +
-                    '<div class="teren-actions"><button class="btn-sm btn-success brat-assign" data-id="' + escapeHtml(b.id) + '" type="button">Przypisz teren</button>' +
-                    '<button class="btn-sm btn-secondary brat-delete" data-id="' + escapeHtml(b.id) + '" type="button">Usuń</button></div></div>';
-            }).join('');
-
-            list.querySelectorAll('.brat-grupa-select').forEach(sel => {
-                sel.onchange = async () => {
-                    const b = bracia.find(x => String(x.id) === sel.dataset.id);
-                    if (b) { b.grupa_id = sel.value; await saveBracia(); }
-                };
-            });
-            list.querySelectorAll('.brat-assign').forEach(btn => {
+            document.getElementById('btn-back-detail').onclick = () => openTerenDetail(drawParentId || selectedTerrainId);
+            document.getElementById('btn-save-subteren').onclick = saveSubteren;
+            document.getElementById('btn-save-teren').onclick = saveTerenEditor;
+            document.getElementById('btn-add-teren').onclick = () => openTerenEditor(null);
+            document.getElementById('btn-clear-draw').onclick = () => { drawnItems.clearLayers(); currentPolygon = null; };
+            document.getElementById('filter-type').onchange = updateFilterValueOptions;
+            document.getElementById('filter-value').onchange = e => { filterValue = e.target.value; renderTerenList(); renderMap(); };
+            document.querySelectorAll('.color-mode-btn').forEach(btn => {
                 btn.onclick = () => {
-                    openAssignModal(null, { type: 'brat', targetId: btn.dataset.id });
+                    colorMode = btn.dataset.mode;
+                    document.querySelectorAll('.color-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+                    renderTerenList();
+                    renderMap();
                 };
             });
-            list.querySelectorAll('.brat-delete').forEach(btn => {
-                btn.onclick = async () => {
-                    if (!confirm('Usunąć brata?')) return;
-                    bracia = bracia.filter(b => String(b.id) !== btn.dataset.id);
-                    await saveBracia();
-                    renderBraciaList();
-                };
-            });
-            list.querySelectorAll('.chip[data-teren]').forEach(chip => {
-                chip.style.cursor = 'pointer';
-                chip.onclick = () => openTerenDetail(chip.dataset.teren);
-            });
-        }
-
-        document.getElementById('btn-add-brat').onclick = async () => {
-            const imie = prompt('Imię:');
-            if (!imie) return;
-            const nazwisko = prompt('Nazwisko:') || '';
-            const maxId = bracia.reduce((m, b) => Math.max(m, parseInt(b.id, 10) || 0), 0);
-            bracia.push({ id: String(maxId + 1), imie, nazwisko, grupa_id: '' });
-            await saveBracia();
-            renderBraciaList();
-        };
-
-        // ── Grupy ───────────────────────────────────────────────────────────
-        function renderGrupyList() {
-            const list = document.getElementById('grupy-list');
-            if (!grupy.length) {
-                list.innerHTML = '<p class="list-empty">Brak grup w arkuszu (zakładki „Grupa 1”, „Grupa 2”…)</p>';
-                return;
-            }
-            list.innerHTML = grupy.map(g => {
-                const cnt = (grupaData[g.id]?.members || []).length;
-                const tCnt = terenyForGrupa(g.id).length;
-                return '<div class="group-item" data-id="' + escapeHtml(g.id) + '">' +
-                    '<strong>' + escapeHtml(g.name || ('Grupa ' + g.id)) + '</strong>' +
-                    '<div class="teren-meta">' + cnt + ' członków · ' + tCnt + ' terenów</div></div>';
-            }).join('');
-
-            list.querySelectorAll('.group-item').forEach(item => {
-                item.onclick = () => showGrupaDetail(item.dataset.id);
-            });
-        }
-
-        function showGrupaDetail(id) {
-            const g = grupaData[id] || { id, members: [], assignments: [] };
-            const detail = document.getElementById('grupa-detail');
-            detail.style.display = 'block';
-            const tereny = terenyForGrupa(id);
-            detail.innerHTML =
-                '<h3 style="font-size:15px;margin-bottom:8px">' + escapeHtml(grupaLabel(id)) + '</h3>' +
-                '<label>Członkowie</label>' +
-                '<div>' + (g.members.length ? g.members.map(m =>
-                    '<span class="chip">' + escapeHtml((m.imie || '') + ' ' + (m.nazwisko || '')) + '</span>'
-                ).join('') : '<em>Brak — zsynchronizuj z arkuszem</em>') + '</div>' +
-                '<label>Przypisane tereny</label>' +
-                '<div>' + (tereny.length ? tereny.map(m =>
-                    '<span class="chip grupa-teren" data-teren="' + escapeHtml(m.teren_nr) + '">' + escapeHtml(m.teren_nr) + '</span>'
-                ).join('') : '<em>Brak</em>') + '</div>' +
-                '<button class="btn-sm btn-success" id="grupa-assign-btn" type="button" style="margin-top:8px">Przypisz teren do grupy</button>';
-
-            document.getElementById('grupa-assign-btn').onclick = () => {
-                openAssignModal(null, { type: 'grupa', targetId: id });
+            document.getElementById('assign-type').onchange = updateAssignTargets;
+            document.getElementById('assign-confirm').onclick = confirmAssign;
+            document.getElementById('assign-cancel').onclick = () => document.getElementById('assign-modal').classList.remove('open');
+            document.getElementById('assign-date-clear').onclick = () => { document.getElementById('assign-date').value = ''; };
+            document.getElementById('unassign-keep-history').onclick = () => {
+                if (unassignTerenId) confirmUnassign(unassignTerenId, false);
             };
-            detail.querySelectorAll('.grupa-teren').forEach(chip => {
-                chip.style.cursor = 'pointer';
-                chip.onclick = () => openTerenDetail(chip.dataset.teren);
-            });
-        }
+            document.getElementById('unassign-clear-history').onclick = () => {
+                if (unassignTerenId) confirmUnassign(unassignTerenId, true);
+            };
+            document.getElementById('unassign-cancel').onclick = () => {
+                unassignTerenId = null;
+                document.getElementById('unassign-modal').classList.remove('open');
+            };
+            document.getElementById('btn-add-grupa').onclick = openGrupaModal;
+            document.getElementById('grupa-create-confirm').onclick = createGrupa;
+            document.getElementById('grupa-create-cancel').onclick = () => {
+                document.getElementById('grupa-modal').classList.remove('open');
+            };
 
-        // ── Filters ─────────────────────────────────────────────────────────
-        function updateFilterValueOptions() {
-            const type = document.getElementById('filter-type').value;
-            const sel = document.getElementById('filter-value');
-            filterType = type;
-            if (!type) { sel.style.display = 'none'; filterValue = ''; renderTerenList(); renderMap(); return; }
-            sel.style.display = 'block';
-            sel.innerHTML = '';
-            if (type === 'grupa') {
-                grupy.forEach(g => {
-                    const o = document.createElement('option');
-                    o.value = g.id; o.textContent = g.name || ('Grupa ' + g.id);
-                    sel.appendChild(o);
-                });
-                filterValue = grupy[0]?.id || '';
-            } else {
-                bracia.forEach(b => {
-                    const o = document.createElement('option');
-                    o.value = b.id; o.textContent = bratLabel(b);
-                    sel.appendChild(o);
-                });
-                filterValue = bracia[0]?.id || '';
-            }
-            sel.value = filterValue;
-            renderTerenList();
-            renderMap();
-        }
-
-        // ── Bottom sheet ────────────────────────────────────────────────────
-        function measureSheet() { sheetHeight = panelSheet.offsetHeight; }
-        function setSheetTranslate(px) {
-            const max = Math.max(0, sheetHeight - SHEET_COLLAPSED);
-            return panelSheet.style.transform = 'translateY(' + Math.max(0, Math.min(max, px)) + 'px)';
-        }
-        function expandSheet() { sheetExpanded = true; measureSheet(); setSheetTranslate(0); }
-        function collapseSheet() { sheetExpanded = false; measureSheet(); setSheetTranslate(sheetHeight - SHEET_COLLAPSED); }
-
-        function initBottomSheet() {
-            if (window.matchMedia('(min-width:768px)').matches) return;
-            measureSheet(); collapseSheet();
-            sheetHandle.addEventListener('pointerdown', e => {
-                isDragging = true; dragMoved = false;
-                dragStartY = e.clientY;
-                const m = panelSheet.style.transform.match(/translateY\(([-\d.]+)px\)/);
-                dragStartTranslate = m ? parseFloat(m[1]) : 0;
-                sheetHandle.setPointerCapture(e.pointerId);
-            });
-            sheetHandle.addEventListener('pointermove', e => {
-                if (!isDragging) return;
-                if (Math.abs(e.clientY - dragStartY) > 4) dragMoved = true;
-                setSheetTranslate(dragStartTranslate + (e.clientY - dragStartY));
-            });
-            sheetHandle.addEventListener('pointerup', e => {
-                if (!isDragging) return;
-                isDragging = false;
-                sheetHandle.releasePointerCapture(e.pointerId);
-                const m = panelSheet.style.transform.match(/translateY\(([-\d.]+)px\)/);
-                const t = m ? parseFloat(m[1]) : 0;
-                (t < (sheetHeight - SHEET_COLLAPSED) * 0.4) ? expandSheet() : collapseSheet();
-            });
-            sheetHandle.addEventListener('click', () => {
-                if (dragMoved) return;
-                sheetExpanded ? collapseSheet() : expandSheet();
-            });
-        }
-
-        // ── Events ──────────────────────────────────────────────────────────
-        document.querySelectorAll('.nav-tab').forEach(btn => btn.onclick = () => setTab(btn.dataset.tab));
-        document.getElementById('btn-back-tereny').onclick = () => setPanelView('tereny');
-        document.getElementById('btn-back-editor').onclick = () => {
-            if (editingTerenId) openTerenDetail(editingTerenId);
-            else setPanelView('tereny');
-        };
-        document.getElementById('btn-back-detail').onclick = () => openTerenDetail(drawParentId || selectedTerrainId);
-        document.getElementById('btn-save-subteren').onclick = saveSubteren;
-        document.getElementById('btn-save-teren').onclick = saveTerenEditor;
-        document.getElementById('btn-clear-teren-draw').onclick = () => { drawnItems.clearLayers(); currentPolygon = null; };
-        document.getElementById('btn-add-teren').onclick = () => openTerenEditor(null);
-        document.getElementById('btn-clear-draw').onclick = () => { drawnItems.clearLayers(); currentPolygon = null; };
-        document.getElementById('filter-type').onchange = updateFilterValueOptions;
-        document.getElementById('filter-value').onchange = e => { filterValue = e.target.value; renderTerenList(); renderMap(); };
-        document.querySelectorAll('.color-mode-btn').forEach(btn => {
-            btn.onclick = () => {
-                colorMode = btn.dataset.mode;
-                document.querySelectorAll('.color-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+            // ── Init ────────────────────────────────────────────────────────────
+            loadBundle().then(() => {
                 renderTerenList();
                 renderMap();
-            };
-        });
-        document.getElementById('assign-type').onchange = updateAssignTargets;
-        document.getElementById('assign-confirm').onclick = confirmAssign;
-        document.getElementById('assign-cancel').onclick = () => document.getElementById('assign-modal').classList.remove('open');
-        document.getElementById('assign-date-clear').onclick = () => { document.getElementById('assign-date').value = ''; };
-        document.getElementById('unassign-keep-history').onclick = () => {
-            if (unassignTerenId) confirmUnassign(unassignTerenId, false);
-        };
-        document.getElementById('unassign-clear-history').onclick = () => {
-            if (unassignTerenId) confirmUnassign(unassignTerenId, true);
-        };
-        document.getElementById('unassign-cancel').onclick = () => {
-            unassignTerenId = null;
-            document.getElementById('unassign-modal').classList.remove('open');
-        };
-        document.getElementById('btn-import-tereny').onclick = importTerenyToSheet;
-        document.getElementById('btn-export-tereny-csv').onclick = exportTerenyCsv;
-        document.getElementById('btn-add-grupa').onclick = openGrupaModal;
-        document.getElementById('grupa-create-confirm').onclick = createGrupa;
-        document.getElementById('grupa-create-cancel').onclick = () => {
-            document.getElementById('grupa-modal').classList.remove('open');
-        };
-
-        // ── Init ────────────────────────────────────────────────────────────
-        loadBundle().then(() => {
-            renderTerenList();
-            renderMap();
-            initBottomSheet();
-            expandSheet();
-        }).catch(e => {
-            console.error('Init failed:', e);
-            setLoading(false);
-            updateSyncStatus('error', '❌ ' + e.message);
-        });
-    })();
+                initBottomSheet();
+                expandSheet();
+            }).catch(e => {
+                console.error('Init failed:', e);
+                setLoading(false);
+                updateSyncStatus('error', '❌ ' + e.message);
+            });
+        })();
     </script>
 </body>
+
 </html>

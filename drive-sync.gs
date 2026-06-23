@@ -24,6 +24,86 @@ var SHEET = {
 };
 
 var OPRACOWANIE_CHUNK = 20;
+var TERENY_MAX_BIEZACE_OPRACOWANIA = 3;
+
+function terenySheetHeaders_() {
+  var headers = [
+    'Numer terenu',
+    'Nazwa',
+    'Teren nadrzędny',
+    'Data ostatniego opracowania',
+    'Typ przydziału',
+    'Aktualny przydział',
+    'Data przydziału'
+  ];
+  for (var n = 1; n <= TERENY_MAX_BIEZACE_OPRACOWANIA; n++) {
+    headers.push('Opracowanie ' + n + ' – przydział');
+    headers.push('Opracowanie ' + n + ' – opracowanie');
+  }
+  return headers;
+}
+
+function braciaSheetHeaders_() {
+  return ['ID', 'Imię', 'Nazwisko', 'Grupa'];
+}
+
+function bratDisplayName_(b) {
+  return (String(b.imie || '') + ' ' + String(b.nazwisko || '')).trim() || ('Brat ' + b.id);
+}
+
+function normalizePrzypisanyTyp_(val) {
+  var s = String(val || '').trim().toLowerCase();
+  if (s === 'brat' || s === 'głosiciel' || s === 'glosiciel') return 'brat';
+  if (s === 'grupa' || s === 'group') return 'grupa';
+  return s;
+}
+
+function formatPrzypisanyTypForSheet_(typ) {
+  if (typ === 'brat') return 'Brat';
+  if (typ === 'grupa') return 'Grupa';
+  return typ || '';
+}
+
+function formatAssigneeForSheet_(typ, id, bracia, grupy) {
+  if (!typ || !id) return '';
+  var idStr = String(id);
+  if (typ === 'grupa') {
+    for (var g = 0; g < grupy.length; g++) {
+      if (String(grupy[g].id) === idStr || String(grupy[g].name) === idStr) {
+        return grupy[g].name || String(grupy[g].id);
+      }
+    }
+    if (/^\d+$/.test(idStr)) return 'Grupa ' + idStr;
+    return idStr;
+  }
+  if (typ === 'brat') {
+    for (var i = 0; i < bracia.length; i++) {
+      if (String(bracia[i].id) === idStr) return bratDisplayName_(bracia[i]);
+    }
+    return idStr;
+  }
+  return idStr;
+}
+
+function parseAssigneeIdFromSheet_(typ, displayValue, bracia, grupy) {
+  var s = String(displayValue || '').trim();
+  if (!s) return '';
+  if (typ === 'brat') {
+    for (var i = 0; i < bracia.length; i++) {
+      if (String(bracia[i].id) === s) return String(bracia[i].id);
+      if (bratDisplayName_(bracia[i]) === s) return String(bracia[i].id);
+    }
+    return s;
+  }
+  if (typ === 'grupa') {
+    for (var g = 0; g < grupy.length; g++) {
+      var name = grupy[g].name || String(grupy[g].id);
+      if (name === s || String(grupy[g].id) === s) return name;
+    }
+    return s;
+  }
+  return s;
+}
 
 /**
  * Uruchom ręcznie w edytorze Apps Script (▶), zaakceptuj uprawnienia,
@@ -284,9 +364,9 @@ function readBracia_() {
   if (data.length < 2) return [];
   var headers = data[0].map(String);
   var cId = findCol_(headers, ['id']);
-  var cImie = findCol_(headers, ['imie', 'imię']);
+  var cImie = findCol_(headers, ['imię', 'imie']);
   var cNazw = findCol_(headers, ['nazwisko']);
-  var cGrupa = findCol_(headers, ['grupa_id', 'grupa']);
+  var cGrupa = findCol_(headers, ['grupa', 'grupa_id']);
   if (cId < 0) cId = 0;
   if (cImie < 0) cImie = 1;
   if (cNazw < 0) cNazw = 2;
@@ -308,14 +388,15 @@ function readBracia_() {
 }
 
 function writeBracia_(rows) {
-  var sh = ensureSheet_(SHEET.bracia, ['id', 'imie', 'nazwisko', 'grupa_id']);
-  var values = [['id', 'imie', 'nazwisko', 'grupa_id']];
+  var headers = braciaSheetHeaders_();
+  var sh = ensureSheet_(SHEET.bracia, headers);
+  var values = [headers.slice()];
   for (var i = 0; i < rows.length; i++) {
     var b = rows[i];
     values.push([b.id, b.imie || '', b.nazwisko || '', b.grupa_id || '']);
   }
   sh.clear();
-  sh.getRange(1, 1, values.length, 4).setValues(values);
+  sh.getRange(1, 1, values.length, headers.length).setValues(values);
   syncGroupMembersFromBracia_(rows);
 }
 
@@ -504,23 +585,103 @@ function writeGrupa_(idOrName, members, assignments) {
 
 // ── Tereny meta ─────────────────────────────────────────────────────────────
 
+function terenyCompletionColCandidates_(n, kind) {
+  var label = kind === 'przydzial' ? 'przydział' : 'opracowanie';
+  var ascii = kind === 'przydzial' ? 'przydzial' : 'opracowanie';
+  return [
+    'opracowanie ' + n + ' – ' + label,
+    'opracowanie ' + n + ' - ' + label,
+    'opracowanie ' + n + ' – ' + ascii,
+    'opracowanie ' + n + ' - ' + ascii
+  ];
+}
+
+function parseCompletionOpracowanieCell_(val) {
+  var s = String(val || '').trim();
+  if (!s) return { date: '', subterenId: null };
+  var m = s.match(/^(\d{4}-\d{2}-\d{2})(?:\s*\(([^)]+)\))?/);
+  if (m) return { date: m[1], subterenId: m[2] ? String(m[2]).trim() : null };
+  return { date: formatDate_(val), subterenId: null };
+}
+
+function formatCompletionOpracowanieCell_(completion) {
+  if (!completion || !completion.date) return '';
+  return completion.subterenId
+    ? (completion.date + ' (' + completion.subterenId + ')')
+    : completion.date;
+}
+
+function readCompletionsFromTerenyRow_(row, cols, dataPrzydzialu) {
+  var fromPairs = [];
+  for (var i = 0; i < TERENY_MAX_BIEZACE_OPRACOWANIA; i++) {
+    var pIdx = cols.oprPrzydzial[i];
+    var oIdx = cols.oprOpracowanie[i];
+    var dp = pIdx >= 0 ? formatDate_(row[pIdx]) : '';
+    var parsed = oIdx >= 0 ? parseCompletionOpracowanieCell_(row[oIdx]) : { date: '', subterenId: null };
+    if (!dp && !parsed.date) continue;
+    fromPairs.push({
+      date: parsed.date,
+      subterenId: parsed.subterenId
+    });
+  }
+  if (fromPairs.length) return fromPairs;
+
+  if (cols.oprJson >= 0 && row[cols.oprJson]) {
+    try {
+      var legacy = JSON.parse(String(row[cols.oprJson]));
+      if (Array.isArray(legacy)) return legacy;
+    } catch (e) { /* legacy JSON */ }
+  }
+  return [];
+}
+
+function completionsToTerenyRowTail_(meta) {
+  var comps = meta.completions || [];
+  var defaultPrzydzial = meta.data_przydzialu || '';
+  var out = [];
+  for (var n = 0; n < TERENY_MAX_BIEZACE_OPRACOWANIA; n++) {
+    var c = comps[n];
+    if (c && c.date) {
+      out.push(defaultPrzydzial);
+      out.push(formatCompletionOpracowanieCell_(c));
+    } else {
+      out.push('');
+      out.push('');
+    }
+  }
+  return out;
+}
+
 function readTerenyMeta_() {
   var sh = getSheetOptional_(SHEET.tereny);
   if (!sh) return [];
   var data = sh.getDataRange().getValues();
   if (data.length < 2) return [];
 
+  var bracia = readBracia_();
+  var grupy = detectGrupy_();
   var headers = data[0].map(String);
   var cols = {
-    teren_nr: findCol_(headers, ['teren_nr', 'teren nr']),
+    teren_nr: findCol_(headers, ['numer terenu', 'teren_nr', 'teren nr']),
     nazwa: findCol_(headers, ['nazwa', 'name']),
-    parent: findCol_(headers, ['parent_teren_nr', 'parent']),
-    ostatnie: findCol_(headers, ['ostatnie_opracowanie', 'data ostatniego opracowania']),
-    typ: findCol_(headers, ['przypisany_typ', 'typ']),
-    pid: findCol_(headers, ['przypisany_id', 'id']),
-    dataP: findCol_(headers, ['data_przydzialu', 'data przydziału']),
-    oprJson: findCol_(headers, ['opracowania_json', 'opracowania'])
+    parent: findCol_(headers, ['teren nadrzędny', 'teren nadrzedny', 'parent_teren_nr', 'parent']),
+    ostatnie: findCol_(headers, ['data ostatniego opracowania', 'ostatnie_opracowanie']),
+    typ: findCol_(headers, ['typ przydziału', 'typ przydzialu', 'przypisany_typ', 'typ']),
+    pid: findCol_(headers, ['aktualny przydział', 'aktualny przydzial', 'przypisany_id']),
+    dataP: findCol_(headers, ['data przydziału', 'data przydzialu', 'data_przydzialu']),
+    oprPrzydzial: [],
+    oprOpracowanie: [],
+    oprJson: findCol_(headers, [
+      'opracowania (bieżący przydział)',
+      'opracowania (biezacy przydzial)',
+      'opracowania_json',
+      'opracowania'
+    ])
   };
+  for (var n = 1; n <= TERENY_MAX_BIEZACE_OPRACOWANIA; n++) {
+    cols.oprPrzydzial.push(findCol_(headers, terenyCompletionColCandidates_(n, 'przydzial')));
+    cols.oprOpracowanie.push(findCol_(headers, terenyCompletionColCandidates_(n, 'opracowanie')));
+  }
 
   var out = [];
   for (var r = 1; r < data.length; r++) {
@@ -528,22 +689,20 @@ function readTerenyMeta_() {
     var terenNr = String(row[cols.teren_nr >= 0 ? cols.teren_nr : 0] || '').trim();
     if (!terenNr) continue;
 
-    var completions = [];
-    if (cols.oprJson >= 0 && row[cols.oprJson]) {
-      try {
-        completions = JSON.parse(String(row[cols.oprJson]));
-        if (!Array.isArray(completions)) completions = [];
-      } catch (e) { completions = []; }
-    }
+    var dataPrzydzialu = cols.dataP >= 0 ? formatDate_(row[cols.dataP]) : '';
+    var completions = readCompletionsFromTerenyRow_(row, cols, dataPrzydzialu);
+    var przypisanyTyp = cols.typ >= 0 ? normalizePrzypisanyTyp_(row[cols.typ]) : '';
+    var przypisanyDisplay = cols.pid >= 0 ? String(row[cols.pid] || '').trim() : '';
+    var przypisanyId = parseAssigneeIdFromSheet_(przypisanyTyp, przypisanyDisplay, bracia, grupy);
 
     out.push({
       teren_nr: terenNr,
       nazwa: cols.nazwa >= 0 ? String(row[cols.nazwa] || '').trim() : '',
       parent_teren_nr: cols.parent >= 0 ? String(row[cols.parent] || '').trim() : '',
       ostatnie_opracowanie: cols.ostatnie >= 0 ? formatDate_(row[cols.ostatnie]) : '',
-      przypisany_typ: cols.typ >= 0 ? String(row[cols.typ] || '').trim() : '',
-      przypisany_id: cols.pid >= 0 ? String(row[cols.pid] || '').trim() : '',
-      data_przydzialu: cols.dataP >= 0 ? formatDate_(row[cols.dataP]) : '',
+      przypisany_typ: przypisanyTyp,
+      przypisany_id: przypisanyId,
+      data_przydzialu: dataPrzydzialu,
       completions: completions
     });
   }
@@ -551,14 +710,11 @@ function readTerenyMeta_() {
 }
 
 function writeTerenyMeta_(rows) {
-  var sh = ensureSheet_(SHEET.tereny, [
-    'teren_nr', 'nazwa', 'parent_teren_nr', 'ostatnie_opracowanie',
-    'przypisany_typ', 'przypisany_id', 'data_przydzialu', 'opracowania_json'
-  ]);
-  var values = [[
-    'teren_nr', 'nazwa', 'parent_teren_nr', 'ostatnie_opracowanie',
-    'przypisany_typ', 'przypisany_id', 'data_przydzialu', 'opracowania_json'
-  ]];
+  var headers = terenySheetHeaders_();
+  var sh = ensureSheet_(SHEET.tereny, headers);
+  var bracia = readBracia_();
+  var grupy = detectGrupy_();
+  var values = [headers.slice()];
   for (var i = 0; i < rows.length; i++) {
     var t = rows[i];
     values.push([
@@ -566,15 +722,14 @@ function writeTerenyMeta_(rows) {
       t.nazwa || '',
       t.parent_teren_nr || '',
       t.ostatnie_opracowanie || '',
-      t.przypisany_typ || '',
-      t.przypisany_id || '',
-      t.data_przydzialu || '',
-      JSON.stringify(t.completions || [])
-    ]);
+      formatPrzypisanyTypForSheet_(t.przypisany_typ),
+      formatAssigneeForSheet_(t.przypisany_typ, t.przypisany_id, bracia, grupy),
+      t.data_przydzialu || ''
+    ].concat(completionsToTerenyRowTail_(t)));
   }
   sh.clear();
   if (values.length > 0) {
-    sh.getRange(1, 1, values.length, 8).setValues(values);
+    sh.getRange(1, 1, values.length, headers.length).setValues(values);
   }
 }
 
