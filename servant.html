@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Służba — Tereny</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
+        .app { display: flex; flex-direction: column; height: 100dvh; position: relative; }
+        .map-wrap { flex: 1; min-height: 0; position: relative; }
+        #map { width: 100%; height: 100%; }
+        .panel-sheet {
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
+            background: #fff; border-radius: 16px 16px 0 0;
+            box-shadow: 0 -4px 28px rgba(0,0,0,.18);
+            display: flex; flex-direction: column; max-height: 88dvh;
+            will-change: transform; touch-action: none;
+        }
+        .panel-sheet.is-dragging { transition: none; }
+        .panel-sheet:not(.is-dragging) { transition: transform .28s cubic-bezier(.32,.72,0,1); }
+        .sheet-handle { flex-shrink: 0; padding: 10px 16px 6px; cursor: grab; touch-action: none; user-select: none; }
+        .sheet-handle:active { cursor: grabbing; }
+        .sheet-handle-bar { width: 40px; height: 4px; background: #ccc; border-radius: 2px; margin: 0 auto 8px; }
+        .sheet-handle-title { text-align: center; font-size: 14px; font-weight: 600; color: #2c3e50; }
+        .sheet-body { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 0 16px 24px; min-height: 0; touch-action: pan-y; position: relative; }
+        .sync-status { font-size: 12px; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
+        .sync-status.synced { background: #d4edda; color: #155724; }
+        .sync-status.local { background: #fff3cd; color: #856404; }
+        .sync-status.loading { background: #e2e3e5; color: #383d41; }
+        .sync-status.error { background: #f8d7da; color: #721c24; }
+        .sync-status.saving { background: #cce5ff; color: #004085; }
+        .sheet-saving { display: none; position: absolute; inset: 0; z-index: 60; background: rgba(255,255,255,.82); align-items: center; justify-content: center; flex-direction: column; gap: 14px; pointer-events: all; }
+        .panel-sheet.is-saving .sheet-saving { display: flex; }
+        .panel-sheet.is-saving .sheet-body { overflow: hidden; }
+        .loading-spinner { width: 36px; height: 36px; border: 3px solid #e0e0e0; border-top-color: #3498db; border-radius: 50%; animation: spin .75s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-overlay { position: fixed; inset: 0; z-index: 3000; background: rgba(240,242,245,.94); display: none; align-items: center; justify-content: center; }
+        .loading-overlay.visible { display: flex; }
+        .nav-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+        .nav-tab { flex: 1; padding: 10px 6px; border: 2px solid #e0e0e0; background: #f8f9fa; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; color: #555; font-family: inherit; }
+        .nav-tab.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+        .panel-view { display: none; }
+        .panel-view.active { display: block; }
+        .panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .panel-header h2 { flex: 1; font-size: 17px; font-weight: 600; color: #2c3e50; }
+        .btn-back { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: none; background: #ecf0f1; border-radius: 8px; cursor: pointer; color: #2c3e50; flex-shrink: 0; }
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+        .filter-bar select { flex: 1; min-width: 120px; padding: 8px 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 13px; font-family: inherit; }
+        .color-mode-toggle { display: flex; gap: 4px; width: 100%; }
+        .color-mode-btn { flex: 1; padding: 8px; border: 2px solid #ddd; background: #fff; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .color-mode-btn.active { border-color: #3498db; background: #ebf5fb; color: #2980b9; }
+        .btn-primary { display: block; width: 100%; padding: 13px; background: #2c3e50; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .btn-success { background: #27ae60; }
+        .btn-warning { background: #e67e22; }
+        .btn-secondary { display: block; width: 100%; padding: 11px; background: #ecf0f1; color: #2c3e50; border: 2px solid #bdc3c7; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 8px; }
+        .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+        .btn-row .btn-primary, .btn-row .btn-secondary { flex: 1; margin-top: 0; }
+        .btn-sm { padding: 6px 10px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; font-family: inherit; font-weight: 600; }
+        label { display: block; margin: 10px 0 4px; font-weight: 600; font-size: 13px; color: #34495e; }
+        input[type="text"], input[type="date"], select.full { width: 100%; padding: 10px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; }
+        .date-row { display: flex; gap: 8px; align-items: center; }
+        .date-row input[type="date"] { flex: 1; }
+        .teren-count { font-size: 13px; color: #666; margin-bottom: 10px; }
+        .teren-list, .person-list, .group-list { display: flex; flex-direction: column; gap: 8px; }
+        .teren-item, .person-item, .group-item {
+            background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 10px;
+            padding: 12px; font-size: 14px; position: relative; cursor: pointer;
+        }
+        .teren-item.selected, .person-item.selected, .group-item.selected { border-color: #3498db; background: #ebf5fb; }
+        .teren-item.subteren { margin-left: 16px; border-left: 3px solid #95a5a6; }
+        .teren-item.archived { opacity: .45; }
+        .teren-color-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 6px; vertical-align: middle; }
+        .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #dfe6e9; color: #2c3e50; margin: 2px 4px 2px 0; }
+        .badge-group { background: #d6eaf8; color: #1a5276; }
+        .badge-brat { background: #fdebd0; color: #7d6608; }
+        .teren-meta { font-size: 12px; color: #666; margin-top: 4px; }
+        .teren-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+        .chip { display: inline-block; font-size: 11px; padding: 3px 8px; background: #e8f6f3; border-radius: 8px; margin: 2px; }
+        .list-empty { text-align: center; color: #999; font-size: 14px; padding: 20px 0; }
+        .draw-banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 800; background: rgba(44,62,80,.92); color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; max-width: calc(100% - 32px); text-align: center; display: none; }
+        .draw-banner.visible { display: block; }
+        .modal { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal.open { display: flex; }
+        .modal-box { background: #fff; border-radius: 16px; padding: 20px; max-width: 400px; width: 100%; max-height: 90dvh; overflow-y: auto; }
+        .modal-box h3 { font-size: 16px; margin-bottom: 14px; color: #2c3e50; }
+        .legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; margin-bottom: 10px; }
+        .legend-item { display: flex; align-items: center; gap: 4px; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+        @media (min-width: 768px) {
+            .app { flex-direction: row; }
+            .map-wrap { flex: 1; }
+            .panel-sheet { position: static; transform: none !important; width: 440px; max-width: 44vw; max-height: none; height: 100%; border-radius: 0; box-shadow: none; border-left: 2px solid #e0e0e0; flex-shrink: 0; }
+            .sheet-handle { display: none; }
+            .sheet-body { padding: 16px 20px 28px; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="loading-overlay" id="loading-overlay" hidden>
+        <div style="text-align:center">
+            <div class="loading-spinner" style="width:44px;height:44px;margin:0 auto 18px"></div>
+            <p id="loading-message">Ładowanie…</p>
+        </div>
+    </div>
+
+    <div class="app">
+        <div class="map-wrap">
+            <div id="map"></div>
+            <div class="draw-banner" id="draw-banner">Rysuj granice subterenu na mapie</div>
+        </div>
+
+        <aside class="panel-sheet" id="panel-sheet">
+            <div class="sheet-handle" id="sheet-handle">
+                <div class="sheet-handle-bar"></div>
+                <div class="sheet-handle-title" id="sheet-handle-title">Służba terenowa</div>
+            </div>
+            <div class="sheet-body">
+                <div class="sheet-saving"><div class="loading-spinner"></div><p>Zapisuję…</p></div>
+                <div id="sync-status" class="sync-status loading">⏳ Ładowanie…</div>
+
+                <div class="nav-tabs">
+                    <button class="nav-tab active" data-tab="tereny" type="button">Tereny</button>
+                    <button class="nav-tab" data-tab="bracia" type="button">Bracia</button>
+                    <button class="nav-tab" data-tab="grupy" type="button">Grupy</button>
+                </div>
+
+                <!-- TERENY -->
+                <div class="panel-view active" id="view-tereny">
+                    <div class="panel-header"><h2>📋 Tereny</h2></div>
+                    <div class="filter-bar">
+                        <select id="filter-type">
+                            <option value="">Wszystkie tereny</option>
+                            <option value="grupa">Grupa…</option>
+                            <option value="brat">Głosiciel…</option>
+                        </select>
+                        <select id="filter-value" style="display:none"></select>
+                    </div>
+                    <div class="color-mode-toggle">
+                        <button class="color-mode-btn active" data-mode="status" type="button">Status przydziału</button>
+                        <button class="color-mode-btn" data-mode="staleness" type="button">Aktualność</button>
+                    </div>
+                    <div class="legend" id="color-legend"></div>
+                    <p class="teren-count" id="teren-count">Tereny: 0</p>
+                    <div class="teren-list" id="teren-list"></div>
+                </div>
+
+                <!-- BRACIA -->
+                <div class="panel-view" id="view-bracia">
+                    <div class="panel-header"><h2>👥 Bracia</h2></div>
+                    <button class="btn-primary btn-success" id="btn-add-brat" type="button">➕ Dodaj brata</button>
+                    <div class="person-list" id="bracia-list" style="margin-top:12px"></div>
+                </div>
+
+                <!-- GRUPY -->
+                <div class="panel-view" id="view-grupy">
+                    <div class="panel-header"><h2>🏷️ Grupy</h2></div>
+                    <div class="group-list" id="grupy-list"></div>
+                    <div id="grupa-detail" style="display:none;margin-top:16px"></div>
+                </div>
+
+                <!-- DETAL TERENU -->
+                <div class="panel-view" id="view-teren-detail">
+                    <div class="panel-header">
+                        <button class="btn-back" id="btn-back-tereny" type="button" aria-label="Wróć">←</button>
+                        <h2 id="detail-title">Teren</h2>
+                    </div>
+                    <div id="teren-detail-body"></div>
+                </div>
+
+                <!-- RYSOWANIE SUBTERENU -->
+                <div class="panel-view" id="view-draw">
+                    <div class="panel-header">
+                        <button class="btn-back" id="btn-back-detail" type="button">←</button>
+                        <h2>Subteren</h2>
+                    </div>
+                    <p style="font-size:13px;color:#666;margin-bottom:12px">Narysuj polygon wewnątrz terenu nadrzędnego.</p>
+                    <label for="subteren-id">ID subterenu</label>
+                    <input type="text" id="subteren-id" placeholder="np. 5a">
+                    <label for="subteren-name">Nazwa</label>
+                    <input type="text" id="subteren-name" placeholder="Część terenu">
+                    <div class="btn-row">
+                        <button class="btn-primary btn-success" id="btn-save-subteren" type="button">💾 Zapisz subteren</button>
+                        <button class="btn-secondary" id="btn-clear-draw" type="button">Wyczyść</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Modal przypisania -->
+    <div class="modal" id="assign-modal">
+        <div class="modal-box">
+            <h3 id="assign-modal-title">Przypisz teren</h3>
+            <label>Teren</label>
+            <select id="assign-teren" class="full"></select>
+            <label>Typ</label>
+            <select id="assign-type" class="full">
+                <option value="brat">Brat</option>
+                <option value="grupa">Grupa</option>
+            </select>
+            <label>Osoba / grupa</label>
+            <select id="assign-target" class="full"></select>
+            <label>Data przydziału</label>
+            <div class="date-row">
+                <input type="date" id="assign-date">
+                <button class="btn-sm btn-secondary" id="assign-date-clear" type="button" style="margin:0">×</button>
+            </div>
+            <div class="btn-row">
+                <button class="btn-primary btn-success" id="assign-confirm" type="button">Przypisz</button>
+                <button class="btn-secondary" id="assign-cancel" type="button">Anuluj</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script>
+    (function () {
+        const CONFIG = {
+            DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbxYZ_0_9WA3wZBRgXKIc-1UdILEgoQIyVueTZSzamKcnUsyvHACBfXUr8rIRPA81ZR6/exec',
+            COORD_PRECISION: 5,
+            COLORS: { red: '#e74c3c', yellow: '#f1c40f', orange: '#e67e22', green: '#27ae60', archived: '#95a5a6' }
+        };
+
+        let database = { type: 'FeatureCollection', features: [] };
+        let bracia = [];
+        let grupy = [];
+        let grupaData = {};
+        let terenyMeta = {};
+        let opracowanie = {};
+
+        let activeTab = 'tereny';
+        let panelView = 'tereny';
+        let colorMode = 'status';
+        let filterType = '';
+        let filterValue = '';
+        let selectedTerrainId = null;
+        let assignTerenId = null;
+        let drawParentId = null;
+        let currentPolygon = null;
+        let isSaving = false;
+
+        const featureById = {};
+        const layerById = {};
+        const metaById = {};
+        const SHEET_COLLAPSED = 56;
+        let sheetExpanded = false;
+        let sheetHeight = 0;
+        let dragStartY = 0, dragStartTranslate = 0, isDragging = false, dragMoved = false;
+
+        const panelSheet = document.getElementById('panel-sheet');
+        const sheetHandle = document.getElementById('sheet-handle');
+        const syncStatusEl = document.getElementById('sync-status');
+
+        // ── Utils ───────────────────────────────────────────────────────────
+        function todayISO() {
+            return new Date().toISOString().slice(0, 10);
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+        }
+
+        function getFeatureId(f) { return f.properties?.id ?? f.id ?? '?'; }
+        function getFeatureTitle(f) { const p = f.properties || {}; return p.title || p.name || 'Bez nazwy'; }
+        function isSubteren(f) { return !!(f.properties?.isSubteren || f.properties?.parentId); }
+        function isArchived(f) { return !!f.properties?.archived; }
+        function getParentId(f) { return f.properties?.parentId || ''; }
+
+        function sortFeatures() {
+            database.features.sort((a, b) => {
+                const aId = String(getFeatureId(a));
+                const bId = String(getFeatureId(b));
+                const aM = aId.match(/^(\d+)(.*)/);
+                const bM = bId.match(/^(\d+)(.*)/);
+                if (aM && bM) {
+                    const d = parseInt(aM[1],10) - parseInt(bM[1],10);
+                    return d !== 0 ? d : aM[2].localeCompare(bM[2]);
+                }
+                return aId.localeCompare(bId, 'pl', { numeric: true });
+            });
+        }
+
+        function bratLabel(b) { return (b.imie + ' ' + b.nazwisko).trim() || ('Brat ' + b.id); }
+
+        function getMeta(id) {
+            const key = String(id);
+            if (!metaById[key]) {
+                metaById[key] = terenyMeta[key] || {
+                    teren_nr: key, nazwa: '', parent_teren_nr: '', ostatnie_opracowanie: '',
+                    przypisany_typ: '', przypisany_id: '', data_przydzialu: '', completions: []
+                };
+            }
+            return metaById[key];
+        }
+
+        function syncMetaFromFeatures() {
+            database.features.forEach(f => {
+                const id = String(getFeatureId(f));
+                const m = getMeta(id);
+                m.teren_nr = id;
+                m.nazwa = getFeatureTitle(f);
+                if (f.properties?.parentId) m.parent_teren_nr = String(f.properties.parentId);
+                terenyMeta[id] = m;
+            });
+        }
+
+        function buildTerenyMetaArray() {
+            return Object.values(metaById).map(m => ({
+                teren_nr: m.teren_nr,
+                nazwa: m.nazwa || '',
+                parent_teren_nr: m.parent_teren_nr || '',
+                ostatnie_opracowanie: m.ostatnie_opracowanie || '',
+                przypisany_typ: m.przypisany_typ || '',
+                przypisany_id: m.przypisany_id || '',
+                data_przydzialu: m.data_przydzialu || '',
+                completions: m.completions || []
+            }));
+        }
+
+        function assigneeLabel(meta) {
+            if (!meta.przypisany_typ || !meta.przypisany_id) return '';
+            if (meta.przypisany_typ === 'grupa') return 'Grupa ' + meta.przypisany_id;
+            const b = bracia.find(x => String(x.id) === String(meta.przypisany_id));
+            return b ? bratLabel(b) : ('Brat ' + meta.przypisany_id);
+        }
+
+        function monthsAgo(dateStr) {
+            if (!dateStr) return Infinity;
+            const d = new Date(dateStr);
+            const now = new Date();
+            return (now - d) / (1000 * 60 * 60 * 24 * 30.44);
+        }
+
+        function getTerritoryColor(meta, archived) {
+            if (archived) return CONFIG.COLORS.archived;
+            if (colorMode === 'staleness') {
+                const last = meta.ostatnie_opracowanie;
+                if (!last || monthsAgo(last) > 3) return CONFIG.COLORS.red;
+                return CONFIG.COLORS.green;
+            }
+            if (!meta.przypisany_typ || !meta.przypisany_id) return CONFIG.COLORS.red;
+            if (!meta.data_przydzialu) return CONFIG.COLORS.yellow;
+            const comps = meta.completions || [];
+            if (!comps.length) return CONFIG.COLORS.orange;
+            return CONFIG.COLORS.green;
+        }
+
+        function passesFilter(id, meta) {
+            if (!filterType || !filterValue) return true;
+            if (filterType === 'grupa') {
+                return meta.przypisany_typ === 'grupa' && String(meta.przypisany_id) === filterValue;
+            }
+            if (filterType === 'brat') {
+                return meta.przypisany_typ === 'brat' && String(meta.przypisany_id) === filterValue;
+            }
+            return true;
+        }
+
+        function parentFeatures() {
+            return database.features.filter(f => !isSubteren(f) && !isArchived(f));
+        }
+
+        function subterenyOf(parentId) {
+            return database.features.filter(f =>
+                isSubteren(f) && String(getParentId(f)) === String(parentId) && !isArchived(f)
+            );
+        }
+
+        function terenyForBrat(bratId) {
+            return Object.values(metaById).filter(m =>
+                m.przypisany_typ === 'brat' && String(m.przypisany_id) === String(bratId)
+            );
+        }
+
+        function terenyForGrupa(grupaId) {
+            return Object.values(metaById).filter(m =>
+                m.przypisany_typ === 'grupa' && String(m.przypisany_id) === String(grupaId)
+            );
+        }
+
+        // ── Sync ────────────────────────────────────────────────────────────
+        function updateSyncStatus(status, msg) {
+            syncStatusEl.className = 'sync-status ' + status;
+            const d = { synced: '✅ Zsynchronizowano', local: '⚠️ Dane lokalne', loading: '⏳ Ładowanie…', saving: '⏳ Zapisuję…', error: '❌ Błąd' };
+            syncStatusEl.textContent = msg || d[status] || '';
+        }
+
+        function setLoading(v, msg) {
+            const el = document.getElementById('loading-overlay');
+            if (v) { document.getElementById('loading-message').textContent = msg || 'Ładowanie…'; el.classList.add('visible'); el.removeAttribute('hidden'); }
+            else { el.classList.remove('visible'); el.setAttribute('hidden',''); }
+        }
+
+        function setSaving(s) {
+            isSaving = s;
+            panelSheet.classList.toggle('is-saving', s);
+            panelSheet.querySelectorAll('button,input,select').forEach(el => { el.disabled = s; });
+        }
+
+        function saveBundleLocal() {
+            localStorage.setItem('servantBundle', JSON.stringify({
+                database, bracia, grupy, grupaData, terenyMeta, opracowanie
+            }));
+        }
+
+        function loadBundleLocal() {
+            try {
+                const s = localStorage.getItem('servantBundle');
+                if (!s) return false;
+                const b = JSON.parse(s);
+                if (b.database) database = b.database;
+                if (b.bracia) bracia = b.bracia;
+                if (b.grupy) grupy = b.grupy;
+                if (b.grupaData) grupaData = b.grupaData;
+                if (b.terenyMeta) terenyMeta = b.terenyMeta;
+                if (b.opracowanie) opracowanie = b.opracowanie;
+                Object.keys(terenyMeta).forEach(k => { metaById[k] = terenyMeta[k]; });
+                return true;
+            } catch (e) { return false; }
+        }
+
+        async function apiGet(resource, extra) {
+            let url = CONFIG.DRIVE_SYNC_URL + '?resource=' + encodeURIComponent(resource) + '&t=' + Date.now();
+            if (extra) Object.keys(extra).forEach(k => { url += '&' + k + '=' + encodeURIComponent(extra[k]); });
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('GET ' + resource + ' status ' + res.status);
+            return res.json();
+        }
+
+        async function apiPost(body) {
+            const res = await fetch(CONFIG.DRIVE_SYNC_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) throw new Error('POST status ' + res.status);
+            return res.json();
+        }
+
+        async function loadBundle() {
+            setLoading(true);
+            updateSyncStatus('loading');
+            try {
+                let bundle;
+                try {
+                    bundle = await apiGet('bundle');
+                    if (bundle.error) throw new Error(bundle.error);
+                } catch (e) {
+                    console.warn('Bundle failed, fallback:', e);
+                    const tereny = await apiGet('tereny');
+                    bundle = { tereny, bracia: [], grupy: [], terenyMeta: [], grupaData: {}, opracowanie: {} };
+                }
+                database = bundle.tereny || { type: 'FeatureCollection', features: [] };
+                bracia = bundle.bracia || [];
+                grupy = bundle.grupy || [];
+                grupaData = bundle.grupaData || {};
+                opracowanie = bundle.opracowanie || {};
+                terenyMeta = {};
+                (bundle.terenyMeta || []).forEach(m => { terenyMeta[String(m.teren_nr)] = m; });
+                Object.keys(terenyMeta).forEach(k => { metaById[k] = terenyMeta[k]; });
+                syncMetaFromFeatures();
+                saveBundleLocal();
+                updateSyncStatus('synced');
+            } catch (e) {
+                if (loadBundleLocal()) {
+                    syncMetaFromFeatures();
+                    updateSyncStatus('local', '⚠️ Offline — dane z pamięci');
+                } else {
+                    updateSyncStatus('error', '❌ ' + e.message);
+                }
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function saveTereny() {
+            setSaving(true);
+            try {
+                await apiPost({ resource: 'tereny', data: database });
+                saveBundleLocal();
+                updateSyncStatus('synced');
+                return true;
+            } catch (e) {
+                updateSyncStatus('error', '❌ ' + e.message);
+                return false;
+            } finally { setSaving(false); }
+        }
+
+        async function saveTerenyMeta() {
+            syncMetaFromFeatures();
+            setSaving(true);
+            try {
+                await apiPost({ resource: 'tereny-meta', data: buildTerenyMetaArray() });
+                saveBundleLocal();
+                updateSyncStatus('synced');
+                return true;
+            } catch (e) {
+                updateSyncStatus('error', '❌ ' + e.message);
+                return false;
+            } finally { setSaving(false); }
+        }
+
+        async function saveBracia() {
+            grupy.forEach(g => {
+                grupaData[g.id] = grupaData[g.id] || { id: g.id, members: [], assignments: [] };
+                grupaData[g.id].members = bracia
+                    .filter(b => String(b.grupa_id) === String(g.id))
+                    .map(b => ({ id_brata: b.id, imie: b.imie, nazwisko: b.nazwisko }));
+            });
+            setSaving(true);
+            try {
+                await apiPost({ resource: 'bracia', data: bracia });
+                saveBundleLocal();
+                updateSyncStatus('synced');
+                return true;
+            } catch (e) {
+                updateSyncStatus('error', '❌ ' + e.message);
+                return false;
+            } finally { setSaving(false); }
+        }
+
+        async function saveGrupa(id) {
+            const g = grupaData[id] || { members: [], assignments: [] };
+            setSaving(true);
+            try {
+                await apiPost({ resource: 'grupa', id: String(id), members: g.members, assignments: g.assignments });
+                saveBundleLocal();
+                updateSyncStatus('synced');
+                return true;
+            } catch (e) {
+                updateSyncStatus('error', '❌ ' + e.message);
+                return false;
+            } finally { setSaving(false); }
+        }
+
+        async function postAction(action, payload) {
+            setSaving(true);
+            try {
+                const res = await apiPost(Object.assign({ action: action }, payload));
+                if (res.meta) {
+                    const id = String(res.meta.teren_nr);
+                    metaById[id] = res.meta;
+                    terenyMeta[id] = res.meta;
+                }
+                saveBundleLocal();
+                updateSyncStatus('synced');
+                return res;
+            } catch (e) {
+                updateSyncStatus('error', '❌ ' + e.message);
+                return null;
+            } finally { setSaving(false); }
+        }
+
+        // ── Map ─────────────────────────────────────────────────────────────
+        const map = L.map('map').setView([50, 20], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        const dbLayer = L.featureGroup().addTo(map);
+        const selectedLayer = L.featureGroup().addTo(map);
+        const drawnItems = L.featureGroup().addTo(map);
+
+        const drawControl = new L.Control.Draw({
+            draw: { polygon: { shapeOptions: { color: '#3498db' } }, polyline: false, rectangle: false, circle: false, marker: false, circlemarker: false },
+            edit: { featureGroup: drawnItems }
+        });
+
+        map.on(L.Draw.Event.CREATED, e => {
+            drawnItems.clearLayers();
+            drawnItems.addLayer(e.layer);
+            currentPolygon = e.layer;
+        });
+
+        function polygonLatLngs(f) {
+            return f.geometry.coordinates[0].map(c => [c[1], c[0]]);
+        }
+
+        function terrainStyle(f) {
+            const id = getFeatureId(f);
+            const meta = getMeta(id);
+            const col = getTerritoryColor(meta, isArchived(f));
+            const faded = selectedTerrainId && String(id) !== String(selectedTerrainId);
+            return {
+                color: col, fillColor: col,
+                opacity: faded ? 0.5 : 1, fillOpacity: faded ? 0.12 : (isSubteren(f) ? 0.35 : 0.2),
+                weight: isSubteren(f) ? 2 : 3, dashArray: isSubteren(f) ? '4,4' : '5,5'
+            };
+        }
+
+        function renderMap() {
+            dbLayer.clearLayers();
+            Object.keys(featureById).forEach(k => delete featureById[k]);
+            Object.keys(layerById).forEach(k => delete layerById[k]);
+
+            database.features.forEach(f => {
+                const id = getFeatureId(f);
+                if (!passesFilter(id, getMeta(id))) return;
+                featureById[id] = f;
+                const layer = L.polygon(polygonLatLngs(f), terrainStyle(f)).addTo(dbLayer);
+                layer.on('click', () => { if (panelView === 'tereny' || panelView === 'teren-detail') openTerenDetail(id); });
+                layerById[id] = layer;
+            });
+
+            if (selectedTerrainId && layerById[selectedTerrainId]) {
+                const f = featureById[selectedTerrainId];
+                selectedLayer.clearLayers();
+                const hl = L.polygon(polygonLatLngs(f), Object.assign(terrainStyle(f), { fillOpacity: 0.4, weight: 4 }));
+                selectedLayer.addLayer(hl);
+            } else {
+                selectedLayer.clearLayers();
+            }
+
+            if (dbLayer.getLayers().length && dbLayer.getBounds().isValid()) {
+                map.fitBounds(dbLayer.getBounds(), { padding: [40, 40] });
+            }
+        }
+
+        function setDrawMode(on) {
+            if (on) { map.addControl(drawControl); document.getElementById('draw-banner').classList.add('visible'); }
+            else { map.removeControl(drawControl); document.getElementById('draw-banner').classList.remove('visible'); drawnItems.clearLayers(); currentPolygon = null; }
+        }
+
+        // ── Views ───────────────────────────────────────────────────────────
+        function setPanelView(view) {
+            panelView = view;
+            document.querySelectorAll('.panel-view').forEach(el => el.classList.remove('active'));
+            const el = document.getElementById('view-' + view);
+            if (el) el.classList.add('active');
+            setDrawMode(view === 'draw');
+            if (view === 'tereny') renderTerenList();
+            if (view === 'bracia') renderBraciaList();
+            if (view === 'grupy') renderGrupyList();
+            renderMap();
+            setTimeout(() => map.invalidateSize(), 50);
+        }
+
+        function setTab(tab) {
+            activeTab = tab;
+            document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+            setPanelView(tab);
+        }
+
+        function renderLegend() {
+            const el = document.getElementById('color-legend');
+            if (colorMode === 'staleness') {
+                el.innerHTML = '<span class="legend-item"><span class="legend-dot" style="background:' + CONFIG.COLORS.red + '"></span>>3 mies.</span>' +
+                    '<span class="legend-item"><span class="legend-dot" style="background:' + CONFIG.COLORS.green + '"></span>świeże</span>';
+            } else {
+                el.innerHTML = [
+                    ['red','Utworzony'],['yellow','Przypisany'],['orange','+ data przydziału'],['green','+ opracowany']
+                ].map(([k,l]) => '<span class="legend-item"><span class="legend-dot" style="background:' + CONFIG.COLORS[k] + '"></span>' + l + '</span>').join('');
+            }
+        }
+
+        function renderTerenList() {
+            renderLegend();
+            const list = document.getElementById('teren-list');
+            const parents = parentFeatures().filter(f => passesFilter(getFeatureId(f), getMeta(getFeatureId(f))));
+            document.getElementById('teren-count').textContent = 'Tereny: ' + parents.length;
+
+            if (!parents.length) {
+                list.innerHTML = '<p class="list-empty">Brak terenów</p>';
+                return;
+            }
+
+            let html = '';
+            parents.forEach(f => {
+                html += renderTerenItem(f);
+                subterenyOf(getFeatureId(f)).forEach(sf => { html += renderTerenItem(sf, true); });
+            });
+            list.innerHTML = html;
+
+            list.querySelectorAll('.teren-item').forEach(item => {
+                item.addEventListener('click', e => {
+                    if (e.target.closest('button')) return;
+                    openTerenDetail(item.dataset.id);
+                });
+            });
+            bindTerenActions(list);
+        }
+
+        function renderTerenItem(f, nested) {
+            const id = getFeatureId(f);
+            const meta = getMeta(id);
+            const col = getTerritoryColor(meta, isArchived(f));
+            const assignee = assigneeLabel(meta);
+            const lastComp = (meta.completions || []).slice(-1)[0];
+            const sel = selectedTerrainId === String(id) ? ' selected' : '';
+            const cls = 'teren-item' + (nested ? ' subteren' : '') + (isArchived(f) ? ' archived' : '') + sel;
+            return '<div class="' + cls + '" data-id="' + escapeHtml(id) + '">' +
+                '<strong>' + escapeHtml(id) + '. ' + escapeHtml(getFeatureTitle(f)) + '</strong>' +
+                '<span class="teren-color-dot" style="background:' + col + '"></span>' +
+                (assignee ? '<span class="badge ' + (meta.przypisany_typ === 'grupa' ? 'badge-group' : 'badge-brat') + '">' + escapeHtml(assignee) + '</span>' : '') +
+                '<div class="teren-meta">' +
+                (meta.data_przydzialu ? 'Przydział: ' + escapeHtml(meta.data_przydzialu) : 'Brak daty przydziału') +
+                (lastComp ? ' · Oprac.: ' + escapeHtml(lastComp.date) : '') +
+                (meta.ostatnie_opracowanie ? ' · Ostatnio zdany: ' + escapeHtml(meta.ostatnie_opracowanie) : '') +
+                '</div></div>';
+        }
+
+        function bindTerenActions(container) { /* actions in detail view */ }
+
+        function openTerenDetail(id) {
+            selectedTerrainId = String(id);
+            const f = database.features.find(t => String(getFeatureId(t)) === String(id));
+            if (!f) return;
+            const meta = getMeta(id);
+            document.getElementById('detail-title').textContent = id + '. ' + getFeatureTitle(f);
+            const body = document.getElementById('teren-detail-body');
+            const comps = meta.completions || [];
+            body.innerHTML =
+                '<p><strong>Przypisany:</strong> ' + (assigneeLabel(meta) || '—') + '</p>' +
+                '<label>Data przydziału</label>' +
+                '<div class="date-row"><input type="date" id="detail-assigned-date" value="' + escapeHtml(meta.data_przydzialu || '') + '">' +
+                '<button class="btn-sm btn-secondary" id="detail-clear-assigned" type="button">×</button></div>' +
+                '<label>Opracowania (bieżący przydział)</label>' +
+                '<div>' + (comps.length ? comps.map(c => '<span class="chip">' + escapeHtml(c.date) + (c.subterenId ? ' (' + escapeHtml(c.subterenId) + ')' : '') + '</span>').join('') : '<em>Brak</em>') + '</div>' +
+                '<label>Data opracowania</label>' +
+                '<div class="date-row"><input type="date" id="detail-complete-date" value="' + todayISO() + '">' +
+                '<button class="btn-sm btn-secondary" id="detail-clear-complete" type="button">×</button></div>' +
+                '<div class="teren-actions">' +
+                '<button class="btn-sm btn-success" id="detail-assign" type="button">Przypisz</button>' +
+                '<button class="btn-sm btn-warning" id="detail-complete" type="button">Opracowany</button>' +
+                '<button class="btn-sm btn-primary" id="detail-zdaj" type="button">ZDANY</button>' +
+                (!isSubteren(f) ? '<button class="btn-sm btn-secondary" id="detail-subteren" type="button">+ Subteren</button>' : '') +
+                '</div>';
+
+            document.getElementById('detail-assign').onclick = () => openAssignModal(id);
+            document.getElementById('detail-complete').onclick = async () => {
+                const d = document.getElementById('detail-complete-date').value;
+                await postAction('complete', { terenId: id, date: d || todayISO(), subterenId: isSubteren(f) ? id : null });
+                openTerenDetail(id);
+                renderTerenList();
+                renderMap();
+            };
+            document.getElementById('detail-zdaj').onclick = async () => {
+                if (!confirm('Oznaczyć teren jako ZDANY? Bieżący przydział zostanie zarchiwizowany.')) return;
+                await postAction('zdaj', { terenId: id });
+                archiveSubtereny(id);
+                await saveTereny();
+                await saveTerenyMeta();
+                openTerenDetail(id);
+                renderTerenList();
+                renderMap();
+            };
+            document.getElementById('detail-subteren')?.addEventListener('click', () => startSubterenDraw(id));
+            document.getElementById('detail-clear-assigned').onclick = async () => {
+                meta.data_przydzialu = '';
+                await saveTerenyMeta();
+                openTerenDetail(id);
+            };
+            document.getElementById('detail-assigned-date').onchange = async e => {
+                meta.data_przydzialu = e.target.value || '';
+                await saveTerenyMeta();
+            };
+            document.getElementById('detail-clear-complete').onclick = () => {
+                document.getElementById('detail-complete-date').value = '';
+            };
+
+            setPanelView('teren-detail');
+            if (layerById[id]) map.fitBounds(layerById[id].getBounds(), { padding: [50, 50] });
+        }
+
+        function archiveSubtereny(parentId) {
+            database.features.forEach(f => {
+                if (isSubteren(f) && String(getParentId(f)) === String(parentId)) {
+                    f.properties.archived = true;
+                }
+            });
+            saveTereny();
+        }
+
+        function getNextSubterenId(parentId) {
+            const subs = database.features.filter(f =>
+                isSubteren(f) && String(getParentId(f)) === String(parentId)
+            );
+            const letters = subs.map(f => {
+                const m = String(getFeatureId(f)).match(new RegExp('^' + parentId + '([a-z])', 'i'));
+                return m ? m[1].toLowerCase() : '';
+            }).filter(Boolean);
+            let next = 'a';
+            while (letters.includes(next)) next = String.fromCharCode(next.charCodeAt(0) + 1);
+            return parentId + next;
+        }
+
+        function startSubterenDraw(parentId) {
+            drawParentId = parentId;
+            document.getElementById('subteren-id').value = getNextSubterenId(parentId);
+            document.getElementById('subteren-name').value = 'Subteren ' + parentId;
+            drawnItems.clearLayers();
+            currentPolygon = null;
+            const parent = database.features.find(f => String(getFeatureId(f)) === String(parentId));
+            if (parent) map.fitBounds(L.polygon(polygonLatLngs(parent)).getBounds(), { padding: [40, 40] });
+            setPanelView('draw');
+        }
+
+        async function saveSubteren() {
+            const id = document.getElementById('subteren-id').value.trim();
+            const name = document.getElementById('subteren-name').value.trim() || ('Subteren ' + id);
+            if (!id || !drawParentId || !currentPolygon) { alert('Podaj ID i narysuj polygon.'); return; }
+
+            const latlngs = currentPolygon.getLatLngs()[0];
+            const coordinates = latlngs.map(ll => [
+                parseFloat(ll.lng.toFixed(CONFIG.COORD_PRECISION)),
+                parseFloat(ll.lat.toFixed(CONFIG.COORD_PRECISION))
+            ]);
+            const first = coordinates[0], last = coordinates[coordinates.length - 1];
+            if (first[0] !== last[0] || first[1] !== last[1]) coordinates.push([first[0], first[1]]);
+
+            const parentMeta = getMeta(drawParentId);
+            const feature = {
+                type: 'Feature', id: id,
+                geometry: { type: 'Polygon', coordinates: [coordinates] },
+                properties: {
+                    id: id, title: name, name: name,
+                    parentId: String(drawParentId), isSubteren: true,
+                    created: new Date().toISOString()
+                }
+            };
+
+            const idx = database.features.findIndex(f => String(getFeatureId(f)) === id);
+            if (idx >= 0) database.features.splice(idx, 1);
+            database.features.push(feature);
+
+            const subMeta = getMeta(id);
+            subMeta.teren_nr = id;
+            subMeta.nazwa = name;
+            subMeta.parent_teren_nr = String(drawParentId);
+            if (parentMeta.przypisany_typ) {
+                subMeta.przypisany_typ = parentMeta.przypisany_typ;
+                subMeta.przypisany_id = parentMeta.przypisany_id;
+                subMeta.data_przydzialu = parentMeta.data_przydzialu || todayISO();
+            }
+
+            sortFeatures();
+            await saveTereny();
+            await saveTerenyMeta();
+            openTerenDetail(drawParentId);
+        }
+
+        // ── Assign modal ────────────────────────────────────────────────────
+        function populateAssignTerenSelect(selectedId) {
+            const sel = document.getElementById('assign-teren');
+            sel.innerHTML = '';
+            parentFeatures().forEach(f => {
+                const id = getFeatureId(f);
+                const o = document.createElement('option');
+                o.value = id;
+                o.textContent = id + '. ' + getFeatureTitle(f);
+                if (selectedId && String(id) === String(selectedId)) o.selected = true;
+                sel.appendChild(o);
+            });
+        }
+
+        function openAssignModal(terenId, options) {
+            options = options || {};
+            assignTerenId = terenId || null;
+            populateAssignTerenSelect(terenId);
+            document.getElementById('assign-modal-title').textContent =
+                terenId ? ('Przypisz teren ' + terenId) : 'Przypisz teren';
+            document.getElementById('assign-date').value = todayISO();
+            if (options.type) document.getElementById('assign-type').value = options.type;
+            updateAssignTargets();
+            if (options.targetId) document.getElementById('assign-target').value = options.targetId;
+            document.getElementById('assign-modal').classList.add('open');
+        }
+
+        function updateAssignTargets() {
+            const type = document.getElementById('assign-type').value;
+            const sel = document.getElementById('assign-target');
+            sel.innerHTML = '';
+            if (type === 'brat') {
+                bracia.forEach(b => {
+                    const o = document.createElement('option');
+                    o.value = b.id; o.textContent = bratLabel(b);
+                    sel.appendChild(o);
+                });
+            } else {
+                grupy.forEach(g => {
+                    const o = document.createElement('option');
+                    o.value = g.id; o.textContent = g.name || ('Grupa ' + g.id);
+                    sel.appendChild(o);
+                });
+            }
+        }
+
+        async function confirmAssign() {
+            const terenId = document.getElementById('assign-teren').value || assignTerenId;
+            if (!terenId) { alert('Wybierz teren.'); return; }
+            const type = document.getElementById('assign-type').value;
+            const id = document.getElementById('assign-target').value;
+            const date = document.getElementById('assign-date').value;
+            const f = database.features.find(t => String(getFeatureId(t)) === String(terenId));
+            await postAction('assign', {
+                terenId: terenId, type: type, id: id,
+                assignedDate: date || null,
+                nazwa: f ? getFeatureTitle(f) : ''
+            });
+            assignTerenId = terenId;
+            document.getElementById('assign-modal').classList.remove('open');
+            if (selectedTerrainId) openTerenDetail(selectedTerrainId);
+            renderTerenList();
+            renderMap();
+        }
+
+        // ── Bracia ──────────────────────────────────────────────────────────
+        function renderBraciaList() {
+            const list = document.getElementById('bracia-list');
+            if (!bracia.length) {
+                list.innerHTML = '<p class="list-empty">Brak braci — dodaj pierwszego</p>';
+                return;
+            }
+            list.innerHTML = bracia.map(b => {
+                const assigned = terenyForBrat(b.id);
+                const chips = assigned.map(m => '<span class="chip" data-teren="' + escapeHtml(m.teren_nr) + '">' + escapeHtml(m.teren_nr) + '</span>').join('');
+                const grupaOpts = grupy.map(g =>
+                    '<option value="' + escapeHtml(g.id) + '"' + (String(b.grupa_id) === String(g.id) ? ' selected' : '') + '>Grupa ' + escapeHtml(g.id) + '</option>'
+                ).join('');
+                return '<div class="person-item" data-id="' + escapeHtml(b.id) + '">' +
+                    '<strong>' + escapeHtml(bratLabel(b)) + '</strong>' +
+                    '<div style="margin-top:6px"><select class="brat-grupa-select" data-id="' + escapeHtml(b.id) + '">' +
+                    '<option value="">— brak grupy —</option>' + grupaOpts + '</select></div>' +
+                    '<div style="margin-top:6px">' + (chips || '<em style="font-size:12px;color:#888">Brak terenów</em>') + '</div>' +
+                    '<div class="teren-actions"><button class="btn-sm btn-success brat-assign" data-id="' + escapeHtml(b.id) + '" type="button">Przypisz teren</button>' +
+                    '<button class="btn-sm btn-secondary brat-delete" data-id="' + escapeHtml(b.id) + '" type="button">Usuń</button></div></div>';
+            }).join('');
+
+            list.querySelectorAll('.brat-grupa-select').forEach(sel => {
+                sel.onchange = async () => {
+                    const b = bracia.find(x => String(x.id) === sel.dataset.id);
+                    if (b) { b.grupa_id = sel.value; await saveBracia(); }
+                };
+            });
+            list.querySelectorAll('.brat-assign').forEach(btn => {
+                btn.onclick = () => {
+                    openAssignModal(null, { type: 'brat', targetId: btn.dataset.id });
+                };
+            });
+            list.querySelectorAll('.brat-delete').forEach(btn => {
+                btn.onclick = async () => {
+                    if (!confirm('Usunąć brata?')) return;
+                    bracia = bracia.filter(b => String(b.id) !== btn.dataset.id);
+                    await saveBracia();
+                    renderBraciaList();
+                };
+            });
+            list.querySelectorAll('.chip[data-teren]').forEach(chip => {
+                chip.style.cursor = 'pointer';
+                chip.onclick = () => openTerenDetail(chip.dataset.teren);
+            });
+        }
+
+        document.getElementById('btn-add-brat').onclick = async () => {
+            const imie = prompt('Imię:');
+            if (!imie) return;
+            const nazwisko = prompt('Nazwisko:') || '';
+            const maxId = bracia.reduce((m, b) => Math.max(m, parseInt(b.id, 10) || 0), 0);
+            bracia.push({ id: String(maxId + 1), imie, nazwisko, grupa_id: '' });
+            await saveBracia();
+            renderBraciaList();
+        };
+
+        // ── Grupy ───────────────────────────────────────────────────────────
+        function renderGrupyList() {
+            const list = document.getElementById('grupy-list');
+            if (!grupy.length) {
+                list.innerHTML = '<p class="list-empty">Brak grup w arkuszu (zakładki „grupa 1”, „grupa 2”…)</p>';
+                return;
+            }
+            list.innerHTML = grupy.map(g => {
+                const cnt = (grupaData[g.id]?.members || []).length;
+                const tCnt = terenyForGrupa(g.id).length;
+                return '<div class="group-item" data-id="' + escapeHtml(g.id) + '">' +
+                    '<strong>' + escapeHtml(g.name || ('Grupa ' + g.id)) + '</strong>' +
+                    '<div class="teren-meta">' + cnt + ' członków · ' + tCnt + ' terenów</div></div>';
+            }).join('');
+
+            list.querySelectorAll('.group-item').forEach(item => {
+                item.onclick = () => showGrupaDetail(item.dataset.id);
+            });
+        }
+
+        function showGrupaDetail(id) {
+            const g = grupaData[id] || { id, members: [], assignments: [] };
+            const detail = document.getElementById('grupa-detail');
+            detail.style.display = 'block';
+            const tereny = terenyForGrupa(id);
+            detail.innerHTML =
+                '<h3 style="font-size:15px;margin-bottom:8px">' + escapeHtml('Grupa ' + id) + '</h3>' +
+                '<label>Członkowie</label>' +
+                '<div>' + (g.members.length ? g.members.map(m =>
+                    '<span class="chip">' + escapeHtml((m.imie || '') + ' ' + (m.nazwisko || '')) + '</span>'
+                ).join('') : '<em>Brak — zsynchronizuj z arkuszem</em>') + '</div>' +
+                '<label>Przypisane tereny</label>' +
+                '<div>' + (tereny.length ? tereny.map(m =>
+                    '<span class="chip grupa-teren" data-teren="' + escapeHtml(m.teren_nr) + '">' + escapeHtml(m.teren_nr) + '</span>'
+                ).join('') : '<em>Brak</em>') + '</div>' +
+                '<button class="btn-sm btn-success" id="grupa-assign-btn" type="button" style="margin-top:8px">Przypisz teren do grupy</button>';
+
+            document.getElementById('grupa-assign-btn').onclick = () => {
+                openAssignModal(null, { type: 'grupa', targetId: id });
+            };
+            detail.querySelectorAll('.grupa-teren').forEach(chip => {
+                chip.style.cursor = 'pointer';
+                chip.onclick = () => openTerenDetail(chip.dataset.teren);
+            });
+        }
+
+        // ── Filters ─────────────────────────────────────────────────────────
+        function updateFilterValueOptions() {
+            const type = document.getElementById('filter-type').value;
+            const sel = document.getElementById('filter-value');
+            filterType = type;
+            if (!type) { sel.style.display = 'none'; filterValue = ''; renderTerenList(); renderMap(); return; }
+            sel.style.display = 'block';
+            sel.innerHTML = '';
+            if (type === 'grupa') {
+                grupy.forEach(g => {
+                    const o = document.createElement('option');
+                    o.value = g.id; o.textContent = g.name || ('Grupa ' + g.id);
+                    sel.appendChild(o);
+                });
+                filterValue = grupy[0]?.id || '';
+            } else {
+                bracia.forEach(b => {
+                    const o = document.createElement('option');
+                    o.value = b.id; o.textContent = bratLabel(b);
+                    sel.appendChild(o);
+                });
+                filterValue = bracia[0]?.id || '';
+            }
+            sel.value = filterValue;
+            renderTerenList();
+            renderMap();
+        }
+
+        // ── Bottom sheet ────────────────────────────────────────────────────
+        function measureSheet() { sheetHeight = panelSheet.offsetHeight; }
+        function setSheetTranslate(px) {
+            const max = Math.max(0, sheetHeight - SHEET_COLLAPSED);
+            return panelSheet.style.transform = 'translateY(' + Math.max(0, Math.min(max, px)) + 'px)';
+        }
+        function expandSheet() { sheetExpanded = true; measureSheet(); setSheetTranslate(0); }
+        function collapseSheet() { sheetExpanded = false; measureSheet(); setSheetTranslate(sheetHeight - SHEET_COLLAPSED); }
+
+        function initBottomSheet() {
+            if (window.matchMedia('(min-width:768px)').matches) return;
+            measureSheet(); collapseSheet();
+            sheetHandle.addEventListener('pointerdown', e => {
+                isDragging = true; dragMoved = false;
+                dragStartY = e.clientY;
+                const m = panelSheet.style.transform.match(/translateY\(([-\d.]+)px\)/);
+                dragStartTranslate = m ? parseFloat(m[1]) : 0;
+                sheetHandle.setPointerCapture(e.pointerId);
+            });
+            sheetHandle.addEventListener('pointermove', e => {
+                if (!isDragging) return;
+                if (Math.abs(e.clientY - dragStartY) > 4) dragMoved = true;
+                setSheetTranslate(dragStartTranslate + (e.clientY - dragStartY));
+            });
+            sheetHandle.addEventListener('pointerup', e => {
+                if (!isDragging) return;
+                isDragging = false;
+                sheetHandle.releasePointerCapture(e.pointerId);
+                const m = panelSheet.style.transform.match(/translateY\(([-\d.]+)px\)/);
+                const t = m ? parseFloat(m[1]) : 0;
+                (t < (sheetHeight - SHEET_COLLAPSED) * 0.4) ? expandSheet() : collapseSheet();
+            });
+            sheetHandle.addEventListener('click', () => {
+                if (dragMoved) return;
+                sheetExpanded ? collapseSheet() : expandSheet();
+            });
+        }
+
+        // ── Events ──────────────────────────────────────────────────────────
+        document.querySelectorAll('.nav-tab').forEach(btn => btn.onclick = () => setTab(btn.dataset.tab));
+        document.getElementById('btn-back-tereny').onclick = () => setPanelView('tereny');
+        document.getElementById('btn-back-detail').onclick = () => openTerenDetail(drawParentId || selectedTerrainId);
+        document.getElementById('btn-save-subteren').onclick = saveSubteren;
+        document.getElementById('btn-clear-draw').onclick = () => { drawnItems.clearLayers(); currentPolygon = null; };
+        document.getElementById('filter-type').onchange = updateFilterValueOptions;
+        document.getElementById('filter-value').onchange = e => { filterValue = e.target.value; renderTerenList(); renderMap(); };
+        document.querySelectorAll('.color-mode-btn').forEach(btn => {
+            btn.onclick = () => {
+                colorMode = btn.dataset.mode;
+                document.querySelectorAll('.color-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+                renderTerenList();
+                renderMap();
+            };
+        });
+        document.getElementById('assign-type').onchange = updateAssignTargets;
+        document.getElementById('assign-confirm').onclick = confirmAssign;
+        document.getElementById('assign-cancel').onclick = () => document.getElementById('assign-modal').classList.remove('open');
+        document.getElementById('assign-date-clear').onclick = () => { document.getElementById('assign-date').value = ''; };
+
+        // ── Init ────────────────────────────────────────────────────────────
+        loadBundle().then(() => {
+            renderTerenList();
+            renderMap();
+            initBottomSheet();
+            expandSheet();
+        });
+    })();
+    </script>
+</body>
+</html>
