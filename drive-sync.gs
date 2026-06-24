@@ -244,8 +244,7 @@ function getBundle_(light) {
     bracia: safeRead_(readBracia_, []),
     grupy: safeRead_(detectGrupy_, []),
     terenyMeta: safeRead_(readTerenyMeta_, []),
-    opracowanie: {},
-    grupaData: {}
+    opracowanie: {}
   };
 
   if (!light) {
@@ -258,12 +257,6 @@ function getBundle_(light) {
     }
   }
 
-  for (var g = 0; g < bundle.grupy.length; g++) {
-    var gid = bundle.grupy[g].id;
-    bundle.grupaData[gid] = safeRead_(function (id) {
-      return function () { return readGrupa_(id); };
-    }(gid), { id: String(gid), members: [], assignments: [] });
-  }
   return bundle;
 }
 

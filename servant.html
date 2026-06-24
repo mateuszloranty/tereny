@@ -403,12 +403,211 @@
             padding: 12px;
             font-size: 14px;
             position: relative;
+        }
+
+        .teren-item {
             cursor: pointer;
         }
 
-        .teren-item.selected,
-        .person-item.selected,
-        .group-item.selected {
+        .person-item-header,
+        .group-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .person-item-chevron,
+        .group-item-chevron {
+            font-size: 11px;
+            color: #888;
+            line-height: 1.6;
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .person-item.expanded,
+        .group-item.expanded {
+            border-color: #3498db;
+            background: #ebf5fb;
+        }
+
+        .person-item.expanded .person-item-chevron,
+        .group-item.expanded .group-item-chevron {
+            transform: rotate(180deg);
+        }
+
+        .person-item-body,
+        .group-item-body {
+            margin-top: 12px;
+            padding: 14px 10px 10px;
+            border-top: 1px solid #c5d9eb;
+            background: rgba(255, 255, 255, 0.72);
+            border-radius: 8px;
+            cursor: default;
+        }
+
+        .group-section {
+            margin-bottom: 14px;
+        }
+
+        .group-section:last-of-type {
+            margin-bottom: 0;
+        }
+
+        .group-section-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #4a6278;
+            margin: 0 0 8px;
+        }
+
+        .group-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .group-member-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 7px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.2;
+            color: #1a5276;
+            background: #fff;
+            border: 1px solid #85c1e9;
+            border-radius: 999px;
+            box-shadow: 0 1px 2px rgba(26, 82, 118, 0.08);
+        }
+
+        .group-teren-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 7px 12px;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.2;
+            color: #145a32;
+            background: #fff;
+            border: 1px solid #7dcea0;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(20, 90, 50, 0.08);
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .group-teren-chip:hover {
+            background: #eafaf1;
+            border-color: #27ae60;
+        }
+
+        .group-empty {
+            width: 100%;
+            margin: 0;
+            font-size: 13px;
+            color: #6c7a89;
+            font-style: italic;
+            padding: 10px 12px;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px dashed #b8c9d9;
+        }
+
+        .grupa-assign-btn,
+        .brat-primary-btn {
+            display: block;
+            width: 100%;
+            margin-top: 14px;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            background: linear-gradient(180deg, #2ecc71 0%, #27ae60 100%);
+            color: #fff;
+            box-shadow: 0 2px 6px rgba(39, 174, 96, 0.28);
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+
+        .grupa-assign-btn:hover,
+        .brat-primary-btn:hover {
+            box-shadow: 0 3px 8px rgba(39, 174, 96, 0.35);
+        }
+
+        .grupa-assign-btn:active,
+        .brat-primary-btn:active {
+            transform: translateY(1px);
+        }
+
+        .brat-delete-btn {
+            display: block;
+            width: 100%;
+            margin-top: 8px;
+            padding: 10px 16px;
+            border: 1px solid #f5b7b1;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            background: #fff;
+            color: #c0392b;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .brat-delete-btn:hover {
+            background: #fdedec;
+            border-color: #e6b0aa;
+        }
+
+        .brat-grupa-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #d4e6f1;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            background: #fff;
+            color: #2c3e50;
+        }
+
+        .brat-teren-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .brat-teren-card {
+            padding: 10px 12px;
+            background: #fff;
+            border: 1px solid #d5e8d4;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(20, 90, 50, 0.06);
+        }
+
+        .brat-completion-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6c3483;
+            background: #f5eef8;
+            border: 1px solid #d7bde2;
+            border-radius: 999px;
+            margin: 4px 4px 0 0;
+        }
+
+        .teren-item.selected {
             border-color: #3498db;
             background: #ebf5fb;
         }
@@ -725,26 +924,14 @@
                     <div class="person-list" id="bracia-list" style="margin-top:12px"></div>
                 </div>
 
-                <!-- DETAL BRATA -->
-                <div class="panel-view" id="view-brat-detail">
-                    <div class="panel-header">
-                        <button class="btn-back" id="btn-back-bracia" type="button" aria-label="Wróć">←</button>
-                        <h2 id="brat-detail-title">Brat</h2>
-                    </div>
-                    <div id="brat-detail-body"></div>
-                </div>
-
                 <!-- GRUPY -->
                 <div class="panel-view" id="view-grupy">
                     <div class="panel-header">
                         <h2>🏷️ Grupy</h2>
                     </div>
-                    <p style="font-size:12px;color:#666;margin-bottom:10px;line-height:1.45">
-                        Każda grupa to osobna zakładka w tym samym arkuszu Google Sheets (jak „Grupa 1”).
-                    </p>
+
                     <button class="btn-primary btn-success" id="btn-add-grupa" type="button">➕ Dodaj grupę</button>
                     <div class="group-list" id="grupy-list" style="margin-top:12px"></div>
-                    <div id="grupa-detail" style="display:none;margin-top:16px"></div>
                 </div>
 
                 <!-- DETAL TERENU -->
@@ -883,7 +1070,7 @@
     <script>
         (function () {
             const CONFIG = {
-                DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbwobTo5PaJRB-0_iAmv75vfutNYlPbunAzodPebdX7PjTVelBKHScp2NM4BeNXBkaUz/exec',
+                DRIVE_SYNC_URL: 'https://script.google.com/macros/s/AKfycbzklvco6J2dYZtwj4ZKe0xDVmYruGG-H6F7B8TcG4FXkMhzNHbRDiSbJdInn0r-xZ7A/exec',
                 DB_FILENAME: 'tereny.geojson',
                 FETCH_TIMEOUT_MS: 45000,
                 COORD_PRECISION: 5,
@@ -906,6 +1093,7 @@
             let assignTerenId = null;
             let unassignTerenId = null;
             let selectedBratId = null;
+            let selectedGrupaId = null;
             let drawParentId = null;
             let editingTerenId = null;
             let isCreatingNewTeren = false;
@@ -1110,6 +1298,28 @@
                 );
             }
 
+            function braciaForGrupa(grupaId) {
+                const want = normalizeGrupaId(grupaId);
+                return bracia.filter(b => b.grupa_id && normalizeGrupaId(b.grupa_id) === want);
+            }
+
+            /** Członkowie z arkusza Bracia (kolumna Grupa); tereny z arkusza Tereny. */
+            function rebuildGrupaDataFromSources() {
+                grupaData = {};
+                grupy.forEach(g => {
+                    const key = g.name || g.id;
+                    grupaData[key] = {
+                        id: key,
+                        name: key,
+                        members: braciaForGrupa(key).map(b => ({
+                            id_brata: b.id,
+                            imie: b.imie,
+                            nazwisko: b.nazwisko
+                        }))
+                    };
+                });
+            }
+
             // ── Sync ────────────────────────────────────────────────────────────
             function updateSyncStatus(status, msg) {
                 syncStatusEl.className = 'sync-status ' + status;
@@ -1144,10 +1354,10 @@
                     if (b.database) database = b.database;
                     if (b.bracia) bracia = b.bracia;
                     if (b.grupy) grupy = b.grupy;
-                    if (b.grupaData) grupaData = b.grupaData;
                     if (b.terenyMeta) terenyMeta = b.terenyMeta;
                     if (b.opracowanie) opracowanie = b.opracowanie;
                     Object.keys(terenyMeta).forEach(k => { metaById[k] = terenyMeta[k]; });
+                    rebuildGrupaDataFromSources();
                     return true;
                 } catch (e) { return false; }
             }
@@ -1203,20 +1413,6 @@
                 throw new Error('Nie udało się wczytać tereny.geojson');
             }
 
-            async function loadGrupaDataForGrupy(grupyList) {
-                const data = {};
-                for (const g of grupyList) {
-                    const sheetName = g.name || g.id;
-                    try {
-                        data[sheetName] = await apiGet('grupa', { name: sheetName });
-                    } catch (e) {
-                        console.warn('grupa', sheetName, e);
-                        data[sheetName] = { id: sheetName, name: sheetName, members: [], assignments: [] };
-                    }
-                }
-                return data;
-            }
-
             async function loadSheetBundle() {
                 try {
                     const bundle = await apiGet('bundle', { light: '1' });
@@ -1224,13 +1420,10 @@
                     return bundle;
                 } catch (e) {
                     console.warn('Light bundle failed, trying parts:', e);
-                    const out = { bracia: [], grupy: [], terenyMeta: [], grupaData: {}, opracowanie: {} };
+                    const out = { bracia: [], grupy: [], terenyMeta: [], opracowanie: {} };
                     try { out.bracia = await apiGet('bracia'); } catch (err) { console.warn(err); }
                     try { out.terenyMeta = await apiGet('tereny-meta'); } catch (err) { console.warn(err); }
                     try { out.grupy = await apiGet('grupy'); } catch (err) { console.warn(err); }
-                    if (out.grupy.length) {
-                        out.grupaData = await loadGrupaDataForGrupy(out.grupy);
-                    }
                     return out;
                 }
             }
@@ -1260,11 +1453,11 @@
             function applySheetBundle(bundle) {
                 bracia = bundle.bracia || [];
                 grupy = bundle.grupy || [];
-                grupaData = bundle.grupaData || {};
                 opracowanie = bundle.opracowanie || {};
                 terenyMeta = {};
                 (bundle.terenyMeta || []).forEach(m => { terenyMeta[String(m.teren_nr)] = m; });
                 Object.keys(terenyMeta).forEach(k => { metaById[k] = terenyMeta[k]; });
+                rebuildGrupaDataFromSources();
             }
 
             async function loadBundle() {
@@ -1289,11 +1482,15 @@
                     syncMetaFromFeatures();
                     saveBundleLocal();
                     updateSyncStatus('synced');
+                    if (activeTab === 'bracia') renderBraciaList();
+                    if (activeTab === 'grupy') renderGrupyList();
                 } catch (e) {
                     console.error('loadBundle failed:', e);
                     if (loadBundleLocal()) {
                         syncMetaFromFeatures();
                         updateSyncStatus('local', '⚠️ Offline — dane z pamięci (' + e.message + ')');
+                        if (activeTab === 'bracia') renderBraciaList();
+                        if (activeTab === 'grupy') renderGrupyList();
                     } else {
                         updateSyncStatus('error', '❌ ' + e.message);
                     }
@@ -1337,31 +1534,10 @@
             }
 
             async function saveBracia() {
-                grupy.forEach(g => {
-                    const key = g.name || g.id;
-                    grupaData[key] = grupaData[key] || { id: key, name: key, members: [], assignments: [] };
-                    grupaData[key].members = bracia
-                        .filter(b => normalizeGrupaId(b.grupa_id) === normalizeGrupaId(key))
-                        .map(b => ({ id_brata: b.id, imie: b.imie, nazwisko: b.nazwisko }));
-                });
+                rebuildGrupaDataFromSources();
                 setSaving(true);
                 try {
                     await apiPost({ resource: 'bracia', data: bracia });
-                    saveBundleLocal();
-                    updateSyncStatus('synced');
-                    return true;
-                } catch (e) {
-                    updateSyncStatus('error', '❌ ' + e.message);
-                    return false;
-                } finally { setSaving(false); }
-            }
-
-            async function saveGrupa(idOrName) {
-                const key = normalizeGrupaId(idOrName);
-                const g = grupaData[key] || { members: [], assignments: [] };
-                setSaving(true);
-                try {
-                    await apiPost({ resource: 'grupa', id: key, name: key, members: g.members, assignments: g.assignments });
                     saveBundleLocal();
                     updateSyncStatus('synced');
                     return true;
@@ -1397,13 +1573,7 @@
                 renderTerenList();
                 renderMap();
                 if (activeTab === 'bracia') {
-                    if (panelView === 'brat-detail' && selectedBratId) {
-                        openBratDetail(selectedBratId);
-                    } else if (panelView === 'teren-detail' && terenId) {
-                        openTerenDetail(terenId);
-                    } else {
-                        renderBraciaList();
-                    }
+                    renderBraciaList();
                 } else if (activeTab === 'grupy') {
                     renderGrupyList();
                 } else if (panelView === 'teren-detail' && terenId) {
@@ -1671,6 +1841,7 @@
             function setTab(tab) {
                 activeTab = tab;
                 selectedBratId = null;
+                selectedGrupaId = null;
                 document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
                 setPanelView(tab);
             }
@@ -2144,16 +2315,11 @@
 
                     grupy.push({ id: res.name, name: res.name });
                     grupy.sort((a, b) => a.name.localeCompare(b.name, 'pl', { numeric: true }));
-                    grupaData[res.name] = { id: res.name, name: res.name, members: [], assignments: [] };
-
-                    try {
-                        grupaData[res.name] = await apiGet('grupa', { name: res.name });
-                    } catch (e) { console.warn(e); }
+                    rebuildGrupaDataFromSources();
 
                     saveBundleLocal();
                     document.getElementById('grupa-modal').classList.remove('open');
                     updateSyncStatus('synced');
-                    renderGrupyList();
                     showGrupaDetail(res.name);
                 } catch (e) {
                     updateSyncStatus('error', '❌ ' + e.message);
@@ -2183,59 +2349,99 @@
                 );
             }
 
-            function openBratDetail(bratId) {
-                selectedBratId = String(bratId);
-                const b = bracia.find(x => String(x.id) === String(bratId));
-                if (!b) return;
+            function buildBratSummaryMeta(b) {
+                const parts = [];
+                if (b.grupa_id) parts.push(grupaLabel(b.grupa_id));
+                const tCnt = terenyForBrat(b.id).length;
+                parts.push(tCnt + ' ' + (tCnt === 1 ? 'teren' : 'terenów'));
+                return parts.join(' · ');
+            }
 
-                document.getElementById('brat-detail-title').textContent = bratLabel(b);
-                const assigned = terenyForBrat(bratId);
-                const body = document.getElementById('brat-detail-body');
+            function buildBratBodyHtml(b) {
+                const assigned = terenyForBrat(b.id);
+                const grupaOpts = grupy.map(g =>
+                    '<option value="' + escapeHtml(g.id) + '"' +
+                    (normalizeGrupaId(b.grupa_id) === normalizeGrupaId(g.id) ? ' selected' : '') +
+                    '>' + escapeHtml(g.name) + '</option>'
+                ).join('');
 
-                let html = '';
-                if (b.grupa_id) {
-                    html += '<p style="margin-bottom:12px"><strong>Grupa:</strong> ' + escapeHtml(grupaLabel(b.grupa_id)) + '</p>';
-                }
-
-                html += '<label>Przypisane tereny (' + assigned.length + ')</label>';
-                if (!assigned.length) {
-                    html += '<p style="margin:8px 0 12px"><em>Brak przypisanych terenów</em></p>';
-                } else {
-                    assigned.forEach(m => {
+                let terenyHtml = '<p class="group-empty">Brak przypisanych terenów</p>';
+                if (assigned.length) {
+                    terenyHtml = '<div class="brat-teren-list">' + assigned.map(m => {
                         const f = database.features.find(t => String(getFeatureId(t)) === String(m.teren_nr));
                         const title = f ? getFeatureTitle(f) : (m.nazwa || '');
                         const comps = m.completions || [];
-                        html += '<div class="brat-teren-block">' +
+                        return '<div class="brat-teren-card">' +
                             '<a href="#" class="brat-teren-link" data-teren="' + escapeHtml(m.teren_nr) + '">' +
                             escapeHtml(m.teren_nr) + '. ' + escapeHtml(title) + '</a>' +
-                            '<div class="teren-meta" style="margin-top:6px">Data przydziału: ' + escapeHtml(m.data_przydzialu || '—') + '</div>';
-                        if (m.ostatnie_opracowanie) {
-                            html += '<div class="teren-meta">Ostatnio zdany: ' + escapeHtml(m.ostatnie_opracowanie) + '</div>';
-                        }
-                        html += '<div style="margin-top:6px;font-size:12px;color:#666">Bieżące opracowania:</div>' +
-                            '<div style="margin-top:4px">' +
-                            (comps.length
-                                ? comps.map(c => '<span class="chip">' + escapeHtml(c.date) +
+                            '<div class="teren-meta" style="margin-top:6px">Data przydziału: ' + escapeHtml(m.data_przydzialu || '—') + '</div>' +
+                            (m.ostatnie_opracowanie
+                                ? '<div class="teren-meta">Ostatnio zdany: ' + escapeHtml(m.ostatnie_opracowanie) + '</div>'
+                                : '') +
+                            '<div class="group-section-label" style="margin-top:8px;margin-bottom:4px">Bieżące opracowania</div>' +
+                            '<div>' + (comps.length
+                                ? comps.map(c => '<span class="brat-completion-chip">' + escapeHtml(c.date) +
                                     (c.subterenId ? ' (' + escapeHtml(c.subterenId) + ')' : '') + '</span>').join('')
-                                : '<em style="font-size:12px;color:#888">Brak</em>') +
+                                : '<span class="group-empty" style="padding:6px 10px;font-size:12px">Brak</span>') +
                             '</div></div>';
-                    });
+                    }).join('') + '</div>';
                 }
 
-                html += '<button class="btn-sm btn-success" id="brat-detail-assign" type="button" style="margin-top:12px">Przypisz teren</button>';
-                body.innerHTML = html;
+                return '<div class="group-section">' +
+                    '<span class="group-section-label">Grupa</span>' +
+                    '<select class="brat-grupa-select" data-id="' + escapeHtml(b.id) + '">' +
+                    '<option value="">— brak grupy —</option>' + grupaOpts + '</select></div>' +
+                    '<div class="group-section">' +
+                    '<span class="group-section-label">Przypisane tereny (' + assigned.length + ')</span>' +
+                    terenyHtml + '</div>' +
+                    '<button class="brat-primary-btn brat-assign" data-id="' + escapeHtml(b.id) + '" type="button">+ Przypisz teren</button>' +
+                    '<button class="brat-delete-btn brat-delete" data-id="' + escapeHtml(b.id) + '" type="button">Usuń brata</button>';
+            }
 
-                body.querySelectorAll('.brat-teren-link').forEach(link => {
-                    link.onclick = e => {
-                        e.preventDefault();
-                        openTerenDetail(link.dataset.teren);
-                    };
+            function wireBratBodyEvents(item, b) {
+                item.querySelector('.brat-grupa-select')?.addEventListener('change', async e => {
+                    e.stopPropagation();
+                    const sel = e.target;
+                    const brat = bracia.find(x => String(x.id) === sel.dataset.id);
+                    if (brat) brat.grupa_id = sel.value;
+                    await saveBracia();
+                    renderBraciaList();
+                    if (activeTab === 'grupy') {
+                        rebuildGrupaDataFromSources();
+                        renderGrupyList();
+                    }
                 });
-                document.getElementById('brat-detail-assign').onclick = () => {
-                    openAssignModal(null, { type: 'brat', targetId: bratId });
-                };
+                item.querySelector('.brat-assign')?.addEventListener('click', e => {
+                    e.stopPropagation();
+                    openAssignModal(null, { type: 'brat', targetId: b.id });
+                });
+                item.querySelector('.brat-delete')?.addEventListener('click', async e => {
+                    e.stopPropagation();
+                    if (!confirm('Usunąć brata?')) return;
+                    bracia = bracia.filter(x => String(x.id) !== String(b.id));
+                    if (selectedBratId === String(b.id)) selectedBratId = null;
+                    await saveBracia();
+                    renderBraciaList();
+                    if (activeTab === 'grupy') renderGrupyList();
+                });
+                item.querySelectorAll('.brat-teren-link').forEach(link => {
+                    link.addEventListener('click', e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openTerenDetail(link.dataset.teren);
+                    });
+                });
+            }
 
-                setPanelView('brat-detail');
+            function toggleBratExpanded(id) {
+                const key = String(id);
+                selectedBratId = selectedBratId === key ? null : key;
+                renderBraciaList();
+            }
+
+            function showBratDetail(bratId) {
+                selectedBratId = String(bratId);
+                renderBraciaList();
             }
 
             // ── Bracia ──────────────────────────────────────────────────────────
@@ -2246,50 +2452,24 @@
                     return;
                 }
                 list.innerHTML = bracia.map(b => {
-                    const assigned = terenyForBrat(b.id);
-                    const chips = assigned.map(m => '<span class="chip" data-teren="' + escapeHtml(m.teren_nr) + '">' + escapeHtml(m.teren_nr) + '</span>').join('');
-                    const grupaOpts = grupy.map(g =>
-                        '<option value="' + escapeHtml(g.id) + '"' +
-                        (normalizeGrupaId(b.grupa_id) === normalizeGrupaId(g.id) ? ' selected' : '') +
-                        '>' + escapeHtml(g.name) + '</option>'
-                    ).join('');
-                    return '<div class="person-item' + (selectedBratId === String(b.id) ? ' selected' : '') + '" data-id="' + escapeHtml(b.id) + '">' +
-                        '<strong>' + escapeHtml(bratLabel(b)) + '</strong>' +
-                        '<div style="margin-top:6px"><select class="brat-grupa-select" data-id="' + escapeHtml(b.id) + '">' +
-                        '<option value="">— brak grupy —</option>' + grupaOpts + '</select></div>' +
-                        '<div style="margin-top:6px">' + (chips || '<em style="font-size:12px;color:#888">Brak terenów</em>') + '</div>' +
-                        '<div class="teren-actions"><button class="btn-sm btn-success brat-assign" data-id="' + escapeHtml(b.id) + '" type="button">Przypisz teren</button>' +
-                        '<button class="btn-sm btn-secondary brat-delete" data-id="' + escapeHtml(b.id) + '" type="button">Usuń</button></div></div>';
+                    const expanded = selectedBratId === String(b.id);
+                    return '<div class="person-item' + (expanded ? ' expanded' : '') + '" data-id="' + escapeHtml(b.id) + '">' +
+                        '<div class="person-item-header">' +
+                        '<div><strong>' + escapeHtml(bratLabel(b)) + '</strong>' +
+                        '<div class="teren-meta">' + escapeHtml(buildBratSummaryMeta(b)) + '</div></div>' +
+                        '<span class="person-item-chevron" aria-hidden="true">▼</span></div>' +
+                        (expanded ? '<div class="person-item-body">' + buildBratBodyHtml(b) + '</div>' : '') +
+                        '</div>';
                 }).join('');
 
                 list.querySelectorAll('.person-item').forEach(item => {
-                    item.addEventListener('click', e => {
-                        if (e.target.closest('button, select, .chip')) return;
-                        openBratDetail(item.dataset.id);
+                    item.querySelector('.person-item-header').addEventListener('click', () => {
+                        toggleBratExpanded(item.dataset.id);
                     });
-                });
-                list.querySelectorAll('.brat-grupa-select').forEach(sel => {
-                    sel.onchange = async () => {
-                        const b = bracia.find(x => String(x.id) === sel.dataset.id);
-                        if (b) { b.grupa_id = sel.value; await saveBracia(); }
-                    };
-                });
-                list.querySelectorAll('.brat-assign').forEach(btn => {
-                    btn.onclick = () => {
-                        openAssignModal(null, { type: 'brat', targetId: btn.dataset.id });
-                    };
-                });
-                list.querySelectorAll('.brat-delete').forEach(btn => {
-                    btn.onclick = async () => {
-                        if (!confirm('Usunąć brata?')) return;
-                        bracia = bracia.filter(b => String(b.id) !== btn.dataset.id);
-                        await saveBracia();
-                        renderBraciaList();
-                    };
-                });
-                list.querySelectorAll('.chip[data-teren]').forEach(chip => {
-                    chip.style.cursor = 'pointer';
-                    chip.onclick = () => openTerenDetail(chip.dataset.teren);
+                    if (item.classList.contains('expanded')) {
+                        const b = bracia.find(x => String(x.id) === item.dataset.id);
+                        if (b) wireBratBodyEvents(item, b);
+                    }
                 });
             }
 
@@ -2300,10 +2480,51 @@
                 const maxId = bracia.reduce((m, b) => Math.max(m, parseInt(b.id, 10) || 0), 0);
                 bracia.push({ id: String(maxId + 1), imie, nazwisko, grupa_id: '' });
                 await saveBracia();
-                renderBraciaList();
+                showBratDetail(String(maxId + 1));
+                if (activeTab === 'grupy') renderGrupyList();
             };
 
             // ── Grupy ───────────────────────────────────────────────────────────
+            function buildGrupaBodyHtml(id) {
+                const members = braciaForGrupa(id);
+                const tereny = terenyForGrupa(id);
+                return '<div class="group-section">' +
+                    '<span class="group-section-label">Członkowie</span>' +
+                    '<div class="group-chip-list">' + (members.length ? members.map(m =>
+                        '<span class="group-member-chip">' + escapeHtml(bratLabel(m)) + '</span>'
+                    ).join('') : '<p class="group-empty">Brak — uzupełnij kolumnę Grupa w arkuszu Bracia</p>') + '</div></div>' +
+                    '<div class="group-section">' +
+                    '<span class="group-section-label">Przypisane tereny</span>' +
+                    '<div class="group-chip-list">' + (tereny.length ? tereny.map(m =>
+                        '<span class="group-teren-chip grupa-teren" data-teren="' + escapeHtml(m.teren_nr) + '">' + escapeHtml(m.teren_nr) + '</span>'
+                    ).join('') : '<p class="group-empty">Brak przypisanych terenów</p>') + '</div></div>' +
+                    '<button class="grupa-assign-btn" type="button">+ Przypisz teren do grupy</button>';
+            }
+
+            function wireGrupaBodyEvents(item, id) {
+                item.querySelector('.grupa-assign-btn')?.addEventListener('click', e => {
+                    e.stopPropagation();
+                    openAssignModal(null, { type: 'grupa', targetId: id });
+                });
+                item.querySelectorAll('.group-teren-chip').forEach(chip => {
+                    chip.addEventListener('click', e => {
+                        e.stopPropagation();
+                        openTerenDetail(chip.dataset.teren);
+                    });
+                });
+            }
+
+            function toggleGrupaExpanded(id) {
+                const key = String(id);
+                selectedGrupaId = selectedGrupaId === key ? null : key;
+                renderGrupyList();
+            }
+
+            function showGrupaDetail(id) {
+                selectedGrupaId = String(id);
+                renderGrupyList();
+            }
+
             function renderGrupyList() {
                 const list = document.getElementById('grupy-list');
                 if (!grupy.length) {
@@ -2311,41 +2532,26 @@
                     return;
                 }
                 list.innerHTML = grupy.map(g => {
-                    const cnt = (grupaData[g.id]?.members || []).length;
-                    const tCnt = terenyForGrupa(g.id).length;
-                    return '<div class="group-item" data-id="' + escapeHtml(g.id) + '">' +
-                        '<strong>' + escapeHtml(g.name || ('Grupa ' + g.id)) + '</strong>' +
-                        '<div class="teren-meta">' + cnt + ' członków · ' + tCnt + ' terenów</div></div>';
+                    const id = g.id;
+                    const expanded = selectedGrupaId === String(id);
+                    const cnt = braciaForGrupa(id).length;
+                    const tCnt = terenyForGrupa(id).length;
+                    return '<div class="group-item' + (expanded ? ' expanded' : '') + '" data-id="' + escapeHtml(id) + '">' +
+                        '<div class="group-item-header">' +
+                        '<div><strong>' + escapeHtml(g.name || ('Grupa ' + id)) + '</strong>' +
+                        '<div class="teren-meta">' + cnt + ' członków · ' + tCnt + ' terenów</div></div>' +
+                        '<span class="group-item-chevron" aria-hidden="true">▼</span></div>' +
+                        (expanded ? '<div class="group-item-body">' + buildGrupaBodyHtml(id) + '</div>' : '') +
+                        '</div>';
                 }).join('');
 
                 list.querySelectorAll('.group-item').forEach(item => {
-                    item.onclick = () => showGrupaDetail(item.dataset.id);
-                });
-            }
-
-            function showGrupaDetail(id) {
-                const g = grupaData[id] || { id, members: [], assignments: [] };
-                const detail = document.getElementById('grupa-detail');
-                detail.style.display = 'block';
-                const tereny = terenyForGrupa(id);
-                detail.innerHTML =
-                    '<h3 style="font-size:15px;margin-bottom:8px">' + escapeHtml(grupaLabel(id)) + '</h3>' +
-                    '<label>Członkowie</label>' +
-                    '<div>' + (g.members.length ? g.members.map(m =>
-                        '<span class="chip">' + escapeHtml((m.imie || '') + ' ' + (m.nazwisko || '')) + '</span>'
-                    ).join('') : '<em>Brak — zsynchronizuj z arkuszem</em>') + '</div>' +
-                    '<label>Przypisane tereny</label>' +
-                    '<div>' + (tereny.length ? tereny.map(m =>
-                        '<span class="chip grupa-teren" data-teren="' + escapeHtml(m.teren_nr) + '">' + escapeHtml(m.teren_nr) + '</span>'
-                    ).join('') : '<em>Brak</em>') + '</div>' +
-                    '<button class="btn-sm btn-success" id="grupa-assign-btn" type="button" style="margin-top:8px">Przypisz teren do grupy</button>';
-
-                document.getElementById('grupa-assign-btn').onclick = () => {
-                    openAssignModal(null, { type: 'grupa', targetId: id });
-                };
-                detail.querySelectorAll('.grupa-teren').forEach(chip => {
-                    chip.style.cursor = 'pointer';
-                    chip.onclick = () => openTerenDetail(chip.dataset.teren);
+                    item.querySelector('.group-item-header').addEventListener('click', () => {
+                        toggleGrupaExpanded(item.dataset.id);
+                    });
+                    if (item.classList.contains('expanded')) {
+                        wireGrupaBodyEvents(item, item.dataset.id);
+                    }
                 });
             }
 
@@ -2418,10 +2624,6 @@
             // ── Events ──────────────────────────────────────────────────────────
             document.querySelectorAll('.nav-tab').forEach(btn => btn.onclick = () => setTab(btn.dataset.tab));
             document.getElementById('btn-back-tereny').onclick = () => setPanelView('tereny');
-            document.getElementById('btn-back-bracia').onclick = () => {
-                selectedBratId = null;
-                setPanelView('bracia');
-            };
             document.getElementById('btn-back-editor').onclick = () => {
                 if (editingTerenId) openTerenDetail(editingTerenId);
                 else setPanelView('tereny');
