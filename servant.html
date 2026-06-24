@@ -1641,6 +1641,22 @@
             }
 
             async function loadTerenyGeoJson() {
+                if (CONFIG.DRIVE_SYNC_URL) {
+                    try {
+                        const res = await fetchWithTimeout(
+                            CONFIG.DRIVE_SYNC_URL + '?resource=tereny&t=' + Date.now()
+                        );
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data?.error) throw new Error(data.error);
+                            if (data?.features) return data;
+                        }
+                    } catch (e) {
+                        console.warn('Drive tereny load failed:', e);
+                    }
+                }
+
+                // Backup — lokalny plik tylko gdy Drive niedostępny
                 if (window.location.protocol !== 'file:') {
                     try {
                         const res = await fetch(CONFIG.DB_FILENAME + '?t=' + Date.now());
@@ -1649,23 +1665,10 @@
                             if (data?.features?.length) return data;
                         }
                     } catch (e) {
-                        console.warn('Local tereny.geojson failed:', e);
+                        console.warn('Local tereny.geojson backup failed:', e);
                     }
                 }
-                if (CONFIG.DRIVE_SYNC_URL) {
-                    try {
-                        const res = await fetchWithTimeout(
-                            CONFIG.DRIVE_SYNC_URL + '?resource=tereny&t=' + Date.now()
-                        );
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data?.features) return data;
-                            if (data?.error) throw new Error(data.error);
-                        }
-                    } catch (e) {
-                        console.warn('Drive tereny load failed:', e);
-                    }
-                }
+
                 throw new Error('Nie udało się wczytać tereny.geojson');
             }
 
