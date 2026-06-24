@@ -25,21 +25,27 @@ var SHEET = {
 };
 
 var OPRACOWANIE_CHUNK = 20;
-var TERENY_MAX_BIEZACE_OPRACOWANIA = 3;
+var TERENY_MIN_PERIODS = 3;
+var TERENY_MAX_VISITS_PER_PERIOD = 5;
 
-function terenySheetHeaders_() {
+function terenySheetHeaders_(maxPeriods, maxVisits) {
+  maxPeriods = Math.max(TERENY_MIN_PERIODS, maxPeriods || TERENY_MIN_PERIODS);
+  maxVisits = Math.max(1, maxVisits || 1);
   var headers = [
     'Numer terenu',
     'Nazwa',
     'Teren nadrzędny',
     'Data ostatniego opracowania',
     'Typ przydziału',
-    'Aktualny przydział',
-    'Data przydziału'
+    'Aktualny przydział'
   ];
-  for (var n = 1; n <= TERENY_MAX_BIEZACE_OPRACOWANIA; n++) {
-    headers.push('Opracowanie ' + n + ' – przydział');
-    headers.push('Opracowanie ' + n + ' – opracowanie');
+  for (var p = 1; p <= maxPeriods; p++) {
+    headers.push('Przydział ' + p);
+    for (var v = 1; v <= maxVisits; v++) {
+      headers.push('Opracowanie ' + p + '.' + v + ' – przydział');
+      headers.push('Opracowanie ' + p + '.' + v + ' – opracowanie');
+    }
+    headers.push('Data zdania ' + p);
   }
   return headers;
 }
@@ -182,6 +188,9 @@ function doPost(e) {
     if (body.action === 'zdaj') {
       return jsonOut_(actionZdaj_(body));
     }
+    if (body.action === 'rework' || body.action === 'opracowano-ponownie') {
+      return jsonOut_(actionRework_(body));
+    }
     if (body.action === 'unassign') {
       return jsonOut_(actionUnassign_(body));
     }
@@ -244,8 +253,7 @@ function getBundle_(light) {
     bracia: safeRead_(readBracia_, []),
     grupy: safeRead_(detectGrupy_, []),
     terenyMeta: safeRead_(readTerenyMeta_, []),
-    opracowanie: {},
-    grupaData: {}
+    opracowanie: {}
   };
 
   if (!light) {
@@ -258,12 +266,6 @@ function getBundle_(light) {
     }
   }
 
-  for (var g = 0; g < bundle.grupy.length; g++) {
-    var gid = bundle.grupy[g].id;
-    bundle.grupaData[gid] = safeRead_(function (id) {
-      return function () { return readGrupa_(id); };
-    }(gid), { id: String(gid), members: [], assignments: [] });
-  }
   return bundle;
 }
 
@@ -504,15 +506,67 @@ function writeGrupa_(idOrName, members, assignments) {
 
 // ── Tereny meta ─────────────────────────────────────────────────────────────
 
-function terenyCompletionColCandidates_(n, kind) {
+function emptyVisit_() {
+  return { przydzial: '', opracowanie: '', subterenId: null };
+}
+
+function emptyPeriod_() {
+  return { assignee_typ: '', assignee_id: '', visits: [], data_zdania: '' };
+}
+
+function visitHasData_(v) {
+  return !!(v && (v.przydzial || v.opracowanie));
+}
+
+function periodHasData_(p) {
+  if (!p) return false;
+  if (p.assignee_typ && p.assignee_id) return true;
+  if (p.data_zdania) return true;
+  for (var i = 0; i < (p.visits || []).length; i++) {
+    if (visitHasData_(p.visits[i])) return true;
+  }
+  return false;
+}
+
+function terenyPeriodPrzydzialColCandidates_(p) {
+  return ['przydział ' + p, 'przydzial ' + p];
+}
+
+function terenyVisitColCandidates_(p, v, kind) {
   var label = kind === 'przydzial' ? 'przydział' : 'opracowanie';
   var ascii = kind === 'przydzial' ? 'przydzial' : 'opracowanie';
+  var pv = p + '.' + v;
   return [
-    'opracowanie ' + n + ' – ' + label,
-    'opracowanie ' + n + ' - ' + label,
-    'opracowanie ' + n + ' – ' + ascii,
-    'opracowanie ' + n + ' - ' + ascii
+    'opracowanie ' + pv + ' – ' + label,
+    'opracowanie ' + pv + ' - ' + label,
+    'opracowanie ' + pv + ' – ' + ascii,
+    'opracowanie ' + pv + ' - ' + ascii,
+    'opracowanie ' + p + ' – ' + label,
+    'opracowanie ' + p + ' - ' + label
   ];
+}
+
+function terenyZdaniaColCandidates_(n) {
+  return ['data zdania ' + n, 'data zdania terenu ' + n];
+}
+
+function detectMaxPeriodsFromHeaders_(headers) {
+  var maxP = 0;
+  var maxV = 1;
+  for (var i = 0; i < headers.length; i++) {
+    var h = String(headers[i]);
+    var mp = h.match(/^przydział\s+(\d+)/i) || h.match(/^przydzial\s+(\d+)/i);
+    if (mp) maxP = Math.max(maxP, parseInt(mp[1], 10));
+    var mv = h.match(/opracowanie\s+(\d+)\.(\d+)\s*[–\-]/i) || h.match(/opracowanie\s+(\d+)\s*[–\-]/i);
+    if (mv) {
+      maxP = Math.max(maxP, parseInt(mv[1], 10));
+      if (mv[2]) maxV = Math.max(maxV, parseInt(mv[2], 10));
+    }
+  }
+  return {
+    periods: Math.max(TERENY_MIN_PERIODS, maxP),
+    visits: Math.min(TERENY_MAX_VISITS_PER_PERIOD, Math.max(1, maxV))
+  };
 }
 
 function parseCompletionOpracowanieCell_(val) {
@@ -523,52 +577,246 @@ function parseCompletionOpracowanieCell_(val) {
   return { date: formatDate_(val), subterenId: null };
 }
 
-function formatCompletionOpracowanieCell_(completion) {
-  if (!completion || !completion.date) return '';
-  return completion.subterenId
-    ? (completion.date + ' (' + completion.subterenId + ')')
-    : completion.date;
+function formatVisitOpracowanieCell_(visit) {
+  if (!visit || !visit.opracowanie) return '';
+  return visit.subterenId
+    ? (visit.opracowanie + ' (' + visit.subterenId + ')')
+    : visit.opracowanie;
 }
 
-function readCompletionsFromTerenyRow_(row, cols, dataPrzydzialu) {
-  var fromPairs = [];
-  for (var i = 0; i < TERENY_MAX_BIEZACE_OPRACOWANIA; i++) {
-    var pIdx = cols.oprPrzydzial[i];
-    var oIdx = cols.oprOpracowanie[i];
-    var dp = pIdx >= 0 ? formatDate_(row[pIdx]) : '';
-    var parsed = oIdx >= 0 ? parseCompletionOpracowanieCell_(row[oIdx]) : { date: '', subterenId: null };
-    if (!dp && !parsed.date) continue;
-    fromPairs.push({
-      date: parsed.date,
-      subterenId: parsed.subterenId
-    });
+function parseAssigneeFromPrzydzialCell_(display, bracia, grupy) {
+  var s = String(display || '').trim();
+  if (!s) return { typ: '', id: '' };
+  for (var g = 0; g < grupy.length; g++) {
+    var gname = grupy[g].name || String(grupy[g].id);
+    if (gname === s || String(grupy[g].id) === s) return { typ: 'grupa', id: gname };
   }
-  if (fromPairs.length) return fromPairs;
-
-  if (cols.oprJson >= 0 && row[cols.oprJson]) {
-    try {
-      var legacy = JSON.parse(String(row[cols.oprJson]));
-      if (Array.isArray(legacy)) return legacy;
-    } catch (e) { /* legacy JSON */ }
-  }
-  return [];
-}
-
-function completionsToTerenyRowTail_(meta) {
-  var comps = meta.completions || [];
-  var defaultPrzydzial = meta.data_przydzialu || '';
-  var out = [];
-  for (var n = 0; n < TERENY_MAX_BIEZACE_OPRACOWANIA; n++) {
-    var c = comps[n];
-    if (c && c.date) {
-      out.push(defaultPrzydzial);
-      out.push(formatCompletionOpracowanieCell_(c));
-    } else {
-      out.push('');
-      out.push('');
+  for (var i = 0; i < bracia.length; i++) {
+    if (bratDisplayName_(bracia[i]) === s || String(bracia[i].id) === s) {
+      return { typ: 'brat', id: String(bracia[i].id) };
     }
   }
+  return { typ: 'grupa', id: s };
+}
+
+function migrateLegacyToPeriods_(meta) {
+  var periods = [];
+  var dp = meta.data_przydzialu || '';
+  var comps = meta.completions || [];
+  if (dp || comps.length) {
+    var p = emptyPeriod_();
+    p.assignee_typ = meta.przypisany_typ || '';
+    p.assignee_id = meta.przypisany_id || '';
+    if (!comps.length) {
+      p.visits.push({ przydzial: dp, opracowanie: '', subterenId: null });
+    } else {
+      for (var i = 0; i < comps.length; i++) {
+        p.visits.push({
+          przydzial: dp,
+          opracowanie: comps[i].date || '',
+          subterenId: comps[i].subterenId || null
+        });
+      }
+    }
+    if (!meta.przypisany_typ && meta.ostatnie_opracowanie) {
+      p.data_zdania = meta.ostatnie_opracowanie;
+    }
+    periods.push(p);
+    return periods;
+  }
+
+  var cycles = meta.cycles || [];
+  if (!cycles.length) return [];
+
+  var cur = null;
+  for (var c = 0; c < cycles.length; c++) {
+    var cy = cycles[c];
+    if (!cur) {
+      cur = emptyPeriod_();
+      cur.assignee_typ = meta.przypisany_typ || '';
+      cur.assignee_id = meta.przypisany_id || '';
+    }
+    cur.visits.push({
+      przydzial: cy.przydzial || '',
+      opracowanie: cy.opracowanie || '',
+      subterenId: cy.subterenId || null
+    });
+    if (cy.data_zdania) {
+      cur.data_zdania = cy.data_zdania;
+      periods.push(cur);
+      cur = null;
+    }
+  }
+  if (cur) {
+    if (meta.przypisany_typ) {
+      cur.assignee_typ = meta.przypisany_typ;
+      cur.assignee_id = meta.przypisany_id;
+    }
+    periods.push(cur);
+  }
+  return periods;
+}
+
+function normalizeMetaPeriods_(meta) {
+  if (!meta.periods || !meta.periods.length) {
+    meta.periods = migrateLegacyToPeriods_(meta);
+  }
+  meta.periods = (meta.periods || []).map(function (p) {
+    return {
+      assignee_typ: p.assignee_typ || '',
+      assignee_id: p.assignee_id || '',
+      data_zdania: p.data_zdania || '',
+      visits: (p.visits || []).map(function (v) {
+        return {
+          przydzial: v.przydzial || '',
+          opracowanie: v.opracowanie || '',
+          subterenId: v.subterenId || null
+        };
+      })
+    };
+  });
+  while (meta.periods.length > 1 && !periodHasData_(meta.periods[meta.periods.length - 1])) {
+    meta.periods.pop();
+  }
+  return meta;
+}
+
+function getActivePeriod_(meta) {
+  normalizeMetaPeriods_(meta);
+  for (var i = meta.periods.length - 1; i >= 0; i--) {
+    if (!meta.periods[i].data_zdania) return meta.periods[i];
+  }
+  return null;
+}
+
+function getActiveVisit_(meta) {
+  var period = getActivePeriod_(meta);
+  if (!period || !period.visits.length) return null;
+  return period.visits[period.visits.length - 1];
+}
+
+function buildTerenyColsFromHeaders_(headers) {
+  var dims = detectMaxPeriodsFromHeaders_(headers);
+  var maxP = dims.periods;
+  var maxV = dims.visits;
+  var cols = {
+    teren_nr: findCol_(headers, ['numer terenu', 'teren_nr', 'teren nr']),
+    nazwa: findCol_(headers, ['nazwa', 'name']),
+    parent: findCol_(headers, ['teren nadrzędny', 'teren nadrzedny', 'parent_teren_nr', 'parent']),
+    ostatnie: findCol_(headers, ['data ostatniego opracowania', 'ostatnie_opracowanie']),
+    typ: findCol_(headers, ['typ przydziału', 'typ przydzialu', 'przypisany_typ', 'typ']),
+    pid: findCol_(headers, ['aktualny przydział', 'aktualny przydzial', 'przypisany_id']),
+    dataP: findCol_(headers, ['data przydziału', 'data przydzialu', 'data_przydzialu']),
+    periodPrzydzial: [],
+    visitPrzydzial: [],
+    visitOpracowanie: [],
+    periodZdania: []
+  };
+  for (var p = 1; p <= maxP; p++) {
+    cols.periodPrzydzial.push(findCol_(headers, terenyPeriodPrzydzialColCandidates_(p)));
+    var vp = [];
+    var vo = [];
+    for (var v = 1; v <= maxV; v++) {
+      vp.push(findCol_(headers, terenyVisitColCandidates_(p, v, 'przydzial')));
+      vo.push(findCol_(headers, terenyVisitColCandidates_(p, v, 'opracowanie')));
+    }
+    cols.visitPrzydzial.push(vp);
+    cols.visitOpracowanie.push(vo);
+    cols.periodZdania.push(findCol_(headers, terenyZdaniaColCandidates_(p)));
+  }
+  return cols;
+}
+
+function readPeriodsFromTerenyRow_(row, cols, bracia, grupy, legacyTyp, legacyId) {
+  var maxP = cols.periodPrzydzial.length;
+  var periods = [];
+  var hasNewFormat = cols.periodPrzydzial.some(function (i) { return i >= 0; });
+
+  if (hasNewFormat) {
+    for (var p = 0; p < maxP; p++) {
+      var assigneeDisplay = cols.periodPrzydzial[p] >= 0
+        ? String(row[cols.periodPrzydzial[p]] || '').trim() : '';
+      var parsedAssignee = parseAssigneeFromPrzydzialCell_(assigneeDisplay, bracia, grupy);
+      var visits = [];
+      var vp = cols.visitPrzydzial[p] || [];
+      var vo = cols.visitOpracowanie[p] || [];
+      for (var v = 0; v < vp.length; v++) {
+        var dp = vp[v] >= 0 ? formatDate_(row[vp[v]]) : '';
+        var parsed = vo[v] >= 0 ? parseCompletionOpracowanieCell_(row[vo[v]]) : { date: '', subterenId: null };
+        if (!dp && !parsed.date) continue;
+        visits.push({ przydzial: dp, opracowanie: parsed.date, subterenId: parsed.subterenId });
+      }
+      var dz = cols.periodZdania[p] >= 0 ? formatDate_(row[cols.periodZdania[p]]) : '';
+      if (!assigneeDisplay && !visits.length && !dz) continue;
+      periods.push({
+        assignee_typ: parsedAssignee.typ,
+        assignee_id: parsedAssignee.id,
+        visits: visits,
+        data_zdania: dz
+      });
+    }
+    return periods;
+  }
+
+  // Stary układ: Opracowanie N – przydział | opracowanie | data zdania (każdy = osobny okres)
+  for (var n = 0; n < cols.periodZdania.length; n++) {
+    var pIdx = -1;
+    var oIdx = -1;
+    if (cols.visitPrzydzial[n] && cols.visitPrzydzial[n][0] >= 0) pIdx = cols.visitPrzydzial[n][0];
+    if (cols.visitOpracowanie[n] && cols.visitOpracowanie[n][0] >= 0) oIdx = cols.visitOpracowanie[n][0];
+    var dp = pIdx >= 0 ? formatDate_(row[pIdx]) : '';
+    var parsedOld = oIdx >= 0 ? parseCompletionOpracowanieCell_(row[oIdx]) : { date: '', subterenId: null };
+    var dzOld = cols.periodZdania[n] >= 0 ? formatDate_(row[cols.periodZdania[n]]) : '';
+    if (!dp && !parsedOld.date && !dzOld) continue;
+    periods.push({
+      assignee_typ: legacyTyp || '',
+      assignee_id: legacyId || '',
+      visits: [{ przydzial: dp, opracowanie: parsedOld.date, subterenId: parsedOld.subterenId }],
+      data_zdania: dzOld
+    });
+  }
+  return periods;
+}
+
+function periodsToTerenyRowTail_(periods, maxPeriods, maxVisits, bracia, grupy) {
+  var out = [];
+  for (var p = 0; p < maxPeriods; p++) {
+    var period = (periods && periods[p]) ? periods[p] : emptyPeriod_();
+    out.push(formatAssigneeForSheet_(period.assignee_typ, period.assignee_id, bracia, grupy));
+    for (var v = 0; v < maxVisits; v++) {
+      var visit = (period.visits && period.visits[v]) ? period.visits[v] : emptyVisit_();
+      out.push(visit.przydzial || '');
+      out.push(formatVisitOpracowanieCell_(visit));
+    }
+    out.push(period.data_zdania || '');
+  }
   return out;
+}
+
+function maxPeriodsLayoutNeeded_(rows) {
+  var maxP = TERENY_MIN_PERIODS;
+  var maxV = 1;
+  for (var i = 0; i < rows.length; i++) {
+    normalizeMetaPeriods_(rows[i]);
+    var len = rows[i].periods.length;
+    maxP = Math.max(maxP, len);
+    for (var p = 0; p < rows[i].periods.length; p++) {
+      var period = rows[i].periods[p];
+      maxV = Math.max(maxV, (period.visits || []).length);
+      if (period.data_zdania) maxP = Math.max(maxP, p + 2);
+    }
+    if (rows[i].przypisany_typ && rows[i].przypisany_id) {
+      var active = getActivePeriod_(rows[i]);
+      if (active) {
+        maxP = Math.max(maxP, len);
+        maxV = Math.max(maxV, (active.visits || []).length + 1);
+      }
+    }
+  }
+  return {
+    periods: maxP,
+    visits: Math.min(TERENY_MAX_VISITS_PER_PERIOD, maxV)
+  };
 }
 
 function readTerenyMeta_() {
@@ -580,27 +828,7 @@ function readTerenyMeta_() {
   var bracia = readBracia_();
   var grupy = detectGrupy_();
   var headers = data[0].map(String);
-  var cols = {
-    teren_nr: findCol_(headers, ['numer terenu', 'teren_nr', 'teren nr']),
-    nazwa: findCol_(headers, ['nazwa', 'name']),
-    parent: findCol_(headers, ['teren nadrzędny', 'teren nadrzedny', 'parent_teren_nr', 'parent']),
-    ostatnie: findCol_(headers, ['data ostatniego opracowania', 'ostatnie_opracowanie']),
-    typ: findCol_(headers, ['typ przydziału', 'typ przydzialu', 'przypisany_typ', 'typ']),
-    pid: findCol_(headers, ['aktualny przydział', 'aktualny przydzial', 'przypisany_id']),
-    dataP: findCol_(headers, ['data przydziału', 'data przydzialu', 'data_przydzialu']),
-    oprPrzydzial: [],
-    oprOpracowanie: [],
-    oprJson: findCol_(headers, [
-      'opracowania (bieżący przydział)',
-      'opracowania (biezacy przydzial)',
-      'opracowania_json',
-      'opracowania'
-    ])
-  };
-  for (var n = 1; n <= TERENY_MAX_BIEZACE_OPRACOWANIA; n++) {
-    cols.oprPrzydzial.push(findCol_(headers, terenyCompletionColCandidates_(n, 'przydzial')));
-    cols.oprOpracowanie.push(findCol_(headers, terenyCompletionColCandidates_(n, 'opracowanie')));
-  }
+  var cols = buildTerenyColsFromHeaders_(headers);
 
   var out = [];
   for (var r = 1; r < data.length; r++) {
@@ -608,43 +836,61 @@ function readTerenyMeta_() {
     var terenNr = String(row[cols.teren_nr >= 0 ? cols.teren_nr : 0] || '').trim();
     if (!terenNr) continue;
 
-    var dataPrzydzialu = cols.dataP >= 0 ? formatDate_(row[cols.dataP]) : '';
-    var completions = readCompletionsFromTerenyRow_(row, cols, dataPrzydzialu);
     var przypisanyTyp = cols.typ >= 0 ? normalizePrzypisanyTyp_(row[cols.typ]) : '';
     var przypisanyDisplay = cols.pid >= 0 ? String(row[cols.pid] || '').trim() : '';
     var przypisanyId = parseAssigneeIdFromSheet_(przypisanyTyp, przypisanyDisplay, bracia, grupy);
 
-    out.push({
+    var periods = readPeriodsFromTerenyRow_(row, cols, bracia, grupy, przypisanyTyp, przypisanyId);
+    var dataPrzydzialu = cols.dataP >= 0 ? formatDate_(row[cols.dataP]) : '';
+    if (!periods.length && dataPrzydzialu) {
+      periods.push({
+        assignee_typ: przypisanyTyp,
+        assignee_id: przypisanyId,
+        visits: [{ przydzial: dataPrzydzialu, opracowanie: '', subterenId: null }],
+        data_zdania: ''
+      });
+    }
+
+    var meta = {
       teren_nr: terenNr,
       nazwa: cols.nazwa >= 0 ? String(row[cols.nazwa] || '').trim() : '',
       parent_teren_nr: cols.parent >= 0 ? String(row[cols.parent] || '').trim() : '',
       ostatnie_opracowanie: cols.ostatnie >= 0 ? formatDate_(row[cols.ostatnie]) : '',
       przypisany_typ: przypisanyTyp,
       przypisany_id: przypisanyId,
-      data_przydzialu: dataPrzydzialu,
-      completions: completions
-    });
+      periods: periods
+    };
+    if (periods.length && przypisanyTyp && przypisanyId) {
+      var lastP = periods[periods.length - 1];
+      if (!lastP.data_zdania && !lastP.assignee_typ) {
+        lastP.assignee_typ = przypisanyTyp;
+        lastP.assignee_id = przypisanyId;
+      }
+    }
+    normalizeMetaPeriods_(meta);
+    out.push(meta);
   }
   return out;
 }
 
 function writeTerenyMeta_(rows) {
-  var headers = terenySheetHeaders_();
+  var layout = maxPeriodsLayoutNeeded_(rows);
+  var headers = terenySheetHeaders_(layout.periods, layout.visits);
   var sh = ensureSheet_(SHEET.tereny, headers);
   var bracia = readBracia_();
   var grupy = detectGrupy_();
   var values = [headers.slice()];
   for (var i = 0; i < rows.length; i++) {
     var t = rows[i];
+    normalizeMetaPeriods_(t);
     values.push([
       t.teren_nr,
       t.nazwa || '',
       t.parent_teren_nr || '',
       t.ostatnie_opracowanie || '',
       formatPrzypisanyTypForSheet_(t.przypisany_typ),
-      formatAssigneeForSheet_(t.przypisany_typ, t.przypisany_id, bracia, grupy),
-      t.data_przydzialu || ''
-    ].concat(completionsToTerenyRowTail_(t)));
+      formatAssigneeForSheet_(t.przypisany_typ, t.przypisany_id, bracia, grupy)
+    ].concat(periodsToTerenyRowTail_(t.periods, layout.periods, layout.visits, bracia, grupy)));
   }
   sh.clear();
   if (values.length > 0) {
@@ -683,8 +929,7 @@ function defaultMeta_(terenId, nazwa) {
     ostatnie_opracowanie: '',
     przypisany_typ: '',
     przypisany_id: '',
-    data_przydzialu: '',
-    completions: []
+    periods: []
   };
 }
 
@@ -961,10 +1206,16 @@ function appendOpracowanieHistory_(terenId, dataPrzydzialu, dataOpracowania, ost
 function actionAssign_(body) {
   var terenId = String(body.terenId);
   var meta = getTerenMetaById_(terenId) || defaultMeta_(terenId, body.nazwa || '');
+  normalizeMetaPeriods_(meta);
   meta.przypisany_typ = body.type || '';
   meta.przypisany_id = body.id ? String(body.id) : '';
-  meta.data_przydzialu = body.assignedDate ? formatDate_(body.assignedDate) : '';
-  meta.completions = [];
+  var dp = body.assignedDate ? formatDate_(body.assignedDate) : formatDate_(new Date());
+  meta.periods.push({
+    assignee_typ: meta.przypisany_typ,
+    assignee_id: meta.przypisany_id,
+    visits: [{ przydzial: dp, opracowanie: '', subterenId: null }],
+    data_zdania: ''
+  });
   upsertTerenMeta_(meta);
   return { ok: true, meta: meta };
 }
@@ -972,11 +1223,42 @@ function actionAssign_(body) {
 function actionComplete_(body) {
   var terenId = String(body.terenId);
   var meta = getTerenMetaById_(terenId) || defaultMeta_(terenId, '');
-  if (!meta.completions) meta.completions = [];
-  meta.completions.push({
-    date: body.date ? formatDate_(body.date) : formatDate_(new Date()),
-    subterenId: body.subterenId ? String(body.subterenId) : null
-  });
+  normalizeMetaPeriods_(meta);
+  var period = getActivePeriod_(meta);
+  if (!period) {
+    period = {
+      assignee_typ: meta.przypisany_typ || '',
+      assignee_id: meta.przypisany_id || '',
+      visits: [],
+      data_zdania: ''
+    };
+    meta.periods.push(period);
+  }
+  if (!period.visits.length) {
+    period.visits.push({ przydzial: formatDate_(new Date()), opracowanie: '', subterenId: null });
+  }
+  var visit = period.visits[period.visits.length - 1];
+  visit.opracowanie = body.date ? formatDate_(body.date) : formatDate_(new Date());
+  visit.subterenId = body.subterenId ? String(body.subterenId) : null;
+  upsertTerenMeta_(meta);
+  return { ok: true, meta: meta };
+}
+
+function actionRework_(body) {
+  var terenId = String(body.terenId);
+  var meta = getTerenMetaById_(terenId) || defaultMeta_(terenId, '');
+  if (!meta.przypisany_typ || !meta.przypisany_id) {
+    throw new Error('Brak aktywnego przydziału');
+  }
+  normalizeMetaPeriods_(meta);
+  var period = getActivePeriod_(meta);
+  if (!period) {
+    throw new Error('Brak aktywnego okresu przydziału');
+  }
+  var dp = period.visits.length && period.visits[0].przydzial
+    ? period.visits[0].przydzial
+    : formatDate_(new Date());
+  period.visits.push({ przydzial: dp, opracowanie: '', subterenId: null });
   upsertTerenMeta_(meta);
   return { ok: true, meta: meta };
 }
@@ -984,26 +1266,30 @@ function actionComplete_(body) {
 function actionZdaj_(body) {
   var terenId = String(body.terenId);
   var meta = getTerenMetaById_(terenId) || defaultMeta_(terenId, '');
+  normalizeMetaPeriods_(meta);
 
-  var lastCompletion = '';
-  if (meta.completions && meta.completions.length) {
-    lastCompletion = meta.completions[meta.completions.length - 1].date || '';
+  var period = getActivePeriod_(meta);
+  if (!period && meta.periods.length) period = meta.periods[meta.periods.length - 1];
+  if (!period) {
+    period = emptyPeriod_();
+    meta.periods.push(period);
   }
 
-  var zdajDate = body.date ? formatDate_(body.date) : (lastCompletion || formatDate_(new Date()));
-
-  appendOpracowanieHistory_(
-    terenId,
-    meta.data_przydzialu,
-    zdajDate,
-    zdajDate
+  var lastVisit = period.visits.length ? period.visits[period.visits.length - 1] : null;
+  var zdajDate = body.date ? formatDate_(body.date) : (
+    (lastVisit && lastVisit.opracowanie) || formatDate_(new Date())
   );
+  period.data_zdania = zdajDate;
+
+  var histPrzydzial = period.visits.length && period.visits[0].przydzial
+    ? period.visits[0].przydzial : '';
+  var histOpracowanie = lastVisit && lastVisit.opracowanie ? lastVisit.opracowanie : zdajDate;
+
+  appendOpracowanieHistory_(terenId, histPrzydzial, histOpracowanie, zdajDate);
 
   meta.ostatnie_opracowanie = zdajDate;
   meta.przypisany_typ = '';
   meta.przypisany_id = '';
-  meta.data_przydzialu = '';
-  meta.completions = [];
   upsertTerenMeta_(meta);
 
   return { ok: true, meta: meta, zdajDate: zdajDate };
@@ -1015,9 +1301,8 @@ function actionUnassign_(body) {
 
   meta.przypisany_typ = '';
   meta.przypisany_id = '';
-  meta.data_przydzialu = '';
   if (body.clearHistory) {
-    meta.completions = [];
+    meta.periods = [];
   }
 
   upsertTerenMeta_(meta);
